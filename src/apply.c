@@ -5873,6 +5873,14 @@ upgradeMenu()
 			MENU_UNSELECTED);
 		incntlet = (incntlet != 'z') ? (incntlet+1) : 'A';
 	}
+	if(!(u.clockworkUpgrades&BOOMBOX) && Role_if(PM_BARD)){
+		Sprintf(buf, "internal speaker");
+		any.a_int = 13;	/* must be non-zero */
+		add_menu(tmpwin, NO_GLYPH, &any,
+			incntlet, 0, ATR_NONE, buf,
+			MENU_UNSELECTED);
+		incntlet = (incntlet != 'z') ? (incntlet+1) : 'A';
+	}
 	end_menu(tmpwin, "Choose type:");
 
 	how = PICK_ONE;
@@ -6072,6 +6080,28 @@ struct obj **optr;
 					u.uhungermax += DEFAULT_HMAX;
 					if(u.uhungermax >= DEFAULT_HMAX*10) u.clockworkUpgrades |= upgrade;
 					// useup(comp);
+					useup(obj);
+					*optr = 0;
+					return 1;
+				break;
+				case BOOMBOX:
+					comp = getobj(tools, "build an internal speaker with");
+					if(!comp){
+						pline("Never mind.");
+						return 0;
+					}
+					if (comp->otyp == DRUM){
+						pline("You'll need a more powerful drum to get the volume high enough.");
+						return 0;
+					}
+					if (comp->otyp != DRUM_OF_EARTHQUAKE){
+						pline("You'll need a powerful drum to produce the required sounds.");
+						return 0;
+					}
+					
+					You("combine the components in the upgrade kit with the drum and install an internal speaker.");
+					u.clockworkUpgrades |= upgrade;
+					useup(comp);
 					useup(obj);
 					*optr = 0;
 					return 1;
