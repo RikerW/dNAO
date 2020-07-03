@@ -2222,4 +2222,79 @@ char *argv[];
 # endif
 #endif	/* VPIX_MUSIC */
 
+int
+doboomboxtune()
+{
+	winid tmpwin;
+	int n, how;
+	char buf[BUFSZ];
+	menu_item *selected;
+	anything any;
+
+	tmpwin = create_nhwindow(NHW_MENU);
+	start_menu(tmpwin);
+	any.a_void = 0;		/* zero out all bits */
+
+	Sprintf(buf, "What music do you want to blast?");
+	add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_BOLD, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "Nothing in particular"); // white noise
+	any.a_int = SELECT_NOTHING;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 'n', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "A terrifying song"); // metal
+	any.a_int = SNG_FEAR;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 'h', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "A soothing song"); // lullabies
+	any.a_int = SNG_SLEEP;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 'l', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "A healing song"); // meditation
+	any.a_int = SNG_HEAL;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 't', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "A rally cry"); // military marches
+	any.a_int = SNG_RLLY;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 'm', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "A discordant song"); // disco (like the pun?)
+	any.a_int = SNG_CONFUSION;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 'd', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "A fast-paced song"); // EDM/dubstep
+	any.a_int = SNG_HASTE;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 'e', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "A disturbing song"); // country.
+	any.a_int = SNG_CNCL;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 'c', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	Sprintf(buf, "A lethargic song"); // smooth jazz
+	any.a_int = SNG_SLOW;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 's', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	/*Sprintf(buf, "A friendly song"); // reggae
+	any.a_int = SNG_TAME;	 must be non-zero
+	add_menu(tmpwin, NO_GLYPH, &any, 'r', 0, ATR_NONE, buf, MENU_UNSELECTED);*/
+	// commented out because couldn't think of a good effect
+	// that wasn't overshadowed by "make things peaceful", which is OP
+	
+	Sprintf(buf, "An encouraging song");
+	any.a_int = SNG_COURAGE;	/* must be non-zero */
+	add_menu(tmpwin, NO_GLYPH, &any, 'R', 0, ATR_NONE, buf, MENU_UNSELECTED);
+	
+	end_menu(tmpwin, "Select tune?");
+
+	how = PICK_ONE;
+	n = select_menu(tmpwin, how, &selected);
+	destroy_nhwindow(tmpwin);
+	if ((n > 0) ? selected[0].item.a_int : 0)
+		u.uboombox = selected[0].item.a_int;
+	else
+		return 0;
+	
+	return 1;
+}
+
 /*music.c*/

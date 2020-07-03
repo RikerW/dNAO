@@ -1703,6 +1703,8 @@ E int FDECL(do_play_instrument, (struct obj *));
 E int FDECL(pet_can_sing, (struct monst *,BOOLEAN_P));
 E int FDECL(mon_can_counter_sing, (struct monst *,BOOLEAN_P));
 E int FDECL(resist_song, (struct monst *, int, struct obj *));
+E int NDECL(doboomboxtune);
+
 #endif
 
 /* ### nhlan.c ### */

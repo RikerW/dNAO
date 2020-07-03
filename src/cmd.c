@@ -595,6 +595,15 @@ domonability()
 			MENU_UNSELECTED);
 		atleastone = TRUE;
 	}
+	if(uclockwork && u.clockworkUpgrades&BOOMBOX){
+		Sprintf(buf, "Change boombox tune");
+		any.a_int = MATTK_BOOMBOX;	/* must be non-zero */
+		incntlet = 'T';
+		add_menu(tmpwin, NO_GLYPH, &any,
+			incntlet, 0, ATR_NONE, buf,
+			MENU_UNSELECTED);
+		atleastone = TRUE;
+	}
 	if(uandroid){
 		Sprintf(buf, "Use Android Abilities");
 		any.a_int = MATTK_DROID;	/* must be non-zero */
@@ -777,6 +786,7 @@ domonability()
 	case MATTK_HIDE: return dohide();
 	case MATTK_MIND: return domindblast();
 	case MATTK_CLOCK: return doclockspeed();
+	case MATTK_BOOMBOX: return doboomboxtune();
 	case MATTK_DROID: return doandroid();
 	case MATTK_ELMENTAL: return doelementalbreath();
 	case MATTK_DARK: return dodarken();

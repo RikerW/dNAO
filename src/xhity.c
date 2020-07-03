@@ -1213,6 +1213,54 @@ int tary;
 	if (dopassive)
 		allres = xpassivey(magr, mdef, (struct attack *)0, (struct obj *)0, vis, allres, pd, TRUE);
 	
+	if (youdef && Race_if(PM_CLOCKWORK_AUTOMATON) && !Upolyd && u.uboombox
+		&& !mindless_mon(magr) && !is_deaf(magr) && dist2(u.ux, u.uy, magr->mx, magr->my) < 3
+	){
+		switch (u.uboombox){
+			case SNG_FEAR:
+				if (!rn2(8) && !magr->mflee)
+					monflee(magr, rnd(8), FALSE, TRUE);
+				break;
+			case SNG_SLEEP:
+				if (!rn2(8) && !Sleep_res(magr) && !resist_song(magr, SNG_SLEEP, (struct obj *) 0)){
+					if (canseemon(magr))
+						pline("%s is lulled to sleep by the lullabies emanating from you!", Monnam(magr));
+					sleep_monst(magr, rnd(8), -1);
+				}
+				break;
+			case SNG_CONFUSION:
+				if (!rn2(8) && !resist_song(magr, SNG_CONFUSION, (struct obj *) 0)){
+					if (canseemon(magr))
+						pline("%s is confused by the disco music emanating from you!", Monnam(magr));
+					magr->mconf = 1;
+				}
+				break;
+			case SNG_CNCL:
+				if (!rn2(8) && !resist_song(magr, SNG_CNCL, (struct obj *) 0)){
+					if (canseemon(magr))
+						pline("%s is distressed by the country music emanating from you!", Monnam(magr));
+					magr->mspec_used = magr->mspec_used + rnd(4);
+				}
+				break;
+			case SNG_SLOW:
+				if (!rn2(8) && !resist_song(magr, SNG_SLOW, (struct obj *) 0)){
+					if (canseemon(magr))
+						pline("%s is relaxed by the song emanating from you!", Monnam(magr));
+					magr->movement -= NORMAL_SPEED/2;
+				}
+				break;
+			case SNG_TAME:
+			case SNG_HASTE:
+			case SNG_HEAL:
+			case SNG_RLLY:
+			case SNG_COURAGE:
+				// nothing, those aren't a combat beat
+				break;
+			default:
+				break;
+		}
+	}
+
 	/* reset lillend mask usage */
 	if (!youagr && pa->mtyp == PM_LILLEND)
 		magr->mvar2 = 0;
@@ -2957,6 +3005,9 @@ int flat_acc;
 				bons_acc += sgn(Luck)*rnd(abs(Luck));
 			/* Bard */
 			bons_acc += u.uencouraged;
+			if (Race_if(PM_CLOCKWORK_AUTOMATON) && !Upolyd && u.uboombox == SNG_COURAGE)
+				bons_acc += 2;
+
 			/* Singing Sword */
 			if (uwep && uwep->oartifact == ART_SINGING_SWORD){
 				if (uwep->osinging == OSING_LIFE){
@@ -3004,6 +3055,8 @@ int flat_acc;
 				bons_acc += beastmastery();
 				if (uarm && uarm->oartifact == ART_BEASTMASTER_S_DUSTER && is_animal(magr->data))
 					bons_acc += beastmastery(); // double for the beastmaster's duster
+				if (!mindless_mon(magr) && !is_deaf(magr) && dist2(u.ux, u.uy, magr->mx, magr->my) < 3)
+					bons_acc += 2;
 			}
 			/* Bard */
 			bons_acc += magr->encouraged;
@@ -12539,6 +12592,13 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 			bonsdmg += u.uencouraged;
 		else if (magr)
 			bonsdmg += magr->encouraged;
+
+		if (Race_if(PM_CLOCKWORK_AUTOMATON) && !Upolyd && u.uboombox == SNG_COURAGE){
+			if (youagr)
+				bonsdmg += 2;
+			else if (magr->mtame && !mindless_mon(magr) && !is_deaf(magr) && dist2(u.ux, u.uy, magr->mx, magr->my) < 3)
+				bonsdmg += 2;
+		}
 		/* Singing Sword -- only works when the player is wielding it >_> */
 		if (uwep && uwep->oartifact == ART_SINGING_SWORD) {
 			if (uwep->osinging == OSING_LIFE){

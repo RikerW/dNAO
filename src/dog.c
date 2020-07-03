@@ -683,6 +683,8 @@ boolean pets_only;	/* true for ascension or final escape */
 		pet_dist = 1;
 	if(uwep && uwep->otyp == SHEPHERD_S_CROOK)
 		pet_dist++;
+	if(Race_if(PM_CLOCKWORK_AUTOMATON) && !Upolyd && u.uboombox == SNG_RLLY)
+		pet_dist++;	// works with mindless pets too, it's magical
 	if(u.specialSealsActive&SEAL_COSMOS ||
 		(uarmh && uarmh->oartifact == ART_CROWN_OF_THE_SAINT_KING) ||
 		(uarmh && uarmh->oartifact == ART_HELM_OF_THE_DARK_LORD)

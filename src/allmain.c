@@ -501,6 +501,9 @@ you_regen_hp()
 		perX += HEALCYCLE;
 	}
 	
+	if (Race_if(PM_CLOCKWORK_AUTOMATON) && !Upolyd && u.uboombox == SNG_HEAL)
+		perX += HEALCYCLE/20;
+	
 	// "Natural" regeneration has stricter limitations
 	if (u.regen_blocked > 0) u.regen_blocked--;		// not regen_blocked (NOTE: decremented here)
 	else if (!(nonliving(youracedata) && !uandroid) &&	// not nonliving, however, androids auto-repair while asleep
@@ -1519,6 +1522,9 @@ karemade:
 			if(uwep && uwep->oartifact == ART_SINGING_SWORD && uwep->osinging == OSING_HASTE){
 				moveamt += 2;
 			}
+			
+			if (Race_if(PM_CLOCKWORK_AUTOMATON) && !Upolyd && u.uboombox == SNG_HASTE)
+				moveamt += 2;
 			
 			if(u.specialSealsActive&SEAL_BLACK_WEB && u.utrap && u.utraptype == TT_WEB)
 				moveamt += 8;

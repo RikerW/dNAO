@@ -375,6 +375,7 @@ struct you {
 #define MATTK_WORD 21
 #define MATTK_TNKR 22
 #define MATTK_VAMP 23
+#define MATTK_BOOMBOX 24
 
 	struct attribs	macurr,		/* for monster attribs */
 			mamax;		/* for monster attribs */
@@ -415,7 +416,7 @@ struct you {
 #define ANDROID_COMBO		5
 //define PHASE_ENGINE		32
 //define HEAVY_BLASTER		1024
-	
+	int uboombox;			/* boombox tune */
 	int slowclock;
 	
 	unsigned ucreamed;
