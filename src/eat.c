@@ -3431,7 +3431,7 @@ doeat()		/* generic "eat" command funtion (see cmd.c) */
 			return 1;
 		}
 	}
-	if (otmp->otyp == EYEBALL || otmp->otyp == SEVERED_HAND) {
+	if ((otmp->otyp == EYEBALL || otmp->otyp == SEVERED_HAND) && otmp->oartifact) {
 	    Strcpy(qbuf,"Are you sure you want to eat that?");
 	    if ((c = yn_function(qbuf, ynqchars, 'n')) != 'y') return 0;
 	}
@@ -3464,10 +3464,7 @@ doeat()		/* generic "eat" command funtion (see cmd.c) */
 	    victual.eating = TRUE; /* needed for lesshungry() */
 
 	    material = otmp->obj_material;
-	    if (material == LEATHER ||
-		material == EYEBALL || material == SEVERED_HAND ||
-			material == BONE || material == DRAGON_HIDE
-		) {
+	    if (material == LEATHER || material == BONE || material == DRAGON_HIDE) {
 			u.uconduct.unvegan++;
 			violated_vegetarian();
 	    } else {
