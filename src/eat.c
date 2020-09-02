@@ -3,7 +3,7 @@
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
-#include "mextra.h"
+
 #include "artifact.h"
 /* #define DEBUG */	/* uncomment to enable new eat code debugging */
 
@@ -547,9 +547,9 @@ register struct obj *otmp;
 		dropy(otmp);
 		sellobj_state(SELL_NORMAL);
 	    } else {
-		otmp->oxlth++;		/* hack to prevent merge */
+		otmp->nomerge = TRUE;
 		otmp = addinv(otmp);
-		otmp->oxlth--;
+		otmp->nomerge = FALSE;
 	    }
 	}
 	return(otmp);
@@ -2829,9 +2829,9 @@ doeat()		/* generic "eat" command funtion (see cmd.c) */
 				dropy(otmp);
 				sellobj_state(SELL_NORMAL);
 			} else {
-				otmp->oxlth++;		/* hack to prevent merge */
+				otmp->nomerge = TRUE;
 				otmp = addinv(otmp);
-				otmp->oxlth--;
+				otmp->nomerge = FALSE;
 			}
 		}
 		}
@@ -2969,9 +2969,9 @@ doeat()		/* generic "eat" command funtion (see cmd.c) */
 				dropy(otmp);
 				sellobj_state(SELL_NORMAL);
 				} else {
-				otmp->oxlth++;		/* hack to prevent merge */
-				otmp = addinv(otmp);
-				otmp->oxlth--;
+					otmp->nomerge = TRUE;
+					otmp = addinv(otmp);
+					otmp->nomerge = FALSE;
 				}
 			}
 			}
@@ -3079,9 +3079,9 @@ doeat()		/* generic "eat" command funtion (see cmd.c) */
 						dropy(otmp);
 						sellobj_state(SELL_NORMAL);
 					} else {
-						otmp->oxlth++;		/* hack to prevent merge */
+						otmp->nomerge = TRUE;
 						otmp = addinv(otmp);
-						otmp->oxlth--;
+						otmp->nomerge = FALSE;
 					}
 				}
 			}
@@ -3197,9 +3197,9 @@ doeat()		/* generic "eat" command funtion (see cmd.c) */
 						dropy(otmp);
 						sellobj_state(SELL_NORMAL);
 					} else {
-						otmp->oxlth++;		/* hack to prevent merge */
+						otmp->nomerge = TRUE;
 						otmp = addinv(otmp);
-						otmp->oxlth--;
+						otmp->nomerge = FALSE;
 					}
 				}
 			}
@@ -3315,9 +3315,9 @@ doeat()		/* generic "eat" command funtion (see cmd.c) */
 						dropy(otmp);
 						sellobj_state(SELL_NORMAL);
 					} else {
-						otmp->oxlth++;		/* hack to prevent merge */
+						otmp->nomerge = TRUE;
 						otmp = addinv(otmp);
-						otmp->oxlth--;
+						otmp->nomerge = FALSE;
 					}
 				}
 			}
