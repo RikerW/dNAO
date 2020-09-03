@@ -3,9 +3,9 @@
 
 STATIC_DCL void FDECL(do_digging_projectile, (struct monst *, struct obj *, int, int));
 STATIC_DCL void FDECL(destroy_projectile, (struct monst *, struct obj *));
-STATIC_DCL void FDECL(end_projectile, (struct monst *, struct monst *, struct obj *, struct obj *, boolean, boolean, boolean *));
-STATIC_DCL int FDECL(projectile_attack, (struct monst *, struct monst *, struct obj *, void *, int, int*, int*, int*, int*, boolean, boolean*));
-STATIC_DCL void FDECL(quest_art_swap, (struct obj *, struct monst *, boolean *));
+STATIC_DCL void FDECL(end_projectile, (struct monst *, struct monst *, struct obj **, struct obj *, boolean, boolean));
+STATIC_DCL int FDECL(projectile_attack, (struct monst *, struct monst *, struct obj **, void *, int, int*, int*, int*, int*, boolean));
+STATIC_DCL void FDECL(quest_art_swap, (struct obj **, struct monst *));
 STATIC_DCL void FDECL(sho_obj_return, (struct obj *, int, int));
 STATIC_DCL void FDECL(return_thrownobj, (struct monst *, struct obj *));
 STATIC_DCL void FDECL(toss_up2, (struct obj *));
@@ -58,9 +58,9 @@ boolean verbose;				/* TRUE if messages should be printed even if the player can
 boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stunned/etc */
 {
 	boolean youagr = (magr && magr == &youmonst);
+	struct obj ** thrownobj_p;			/* pointer to thrownobj */
 	struct obj * thrownobj;				/* singular fired/thrown object */
 	boolean onlyone;					/* if ammo only consists of thrownobj */
-	boolean wepgone = FALSE;			/* TRUE if thrownobj is destroyed */
 	boolean returning = FALSE;			/* TRUE if projectile should magically return to magr (like Mjollnir) */
 	struct monst * mdef = (struct monst *)0;
 	int result = 0;
@@ -221,13 +221,16 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 		exercise(A_STR, TRUE);
 	}
 
+	/* set thrownobj_p before we start handing if off to projectile_attack and hmon */
+	thrownobj_p = &thrownobj;
+
 	/* if the player is swallowed, projectile is guaranteed to hit engulfer and no more */
 	if (youagr && u.uswallow) {
 		mdef = u.ustuck;
 		bhitpos.x = x(mdef);
 		bhitpos.y = y(mdef);
-		result = projectile_attack(magr, mdef, thrownobj, vpointer, hmoncode, &dx, &dy, &range, &initrange, forcedestroy, &wepgone);
-		end_projectile(magr, mdef, thrownobj, launcher, fired, forcedestroy, &wepgone);
+		result = projectile_attack(magr, mdef, thrownobj_p, vpointer, hmoncode, &dx, &dy, &range, &initrange, forcedestroy);
+		end_projectile(magr, mdef, thrownobj_p, launcher, fired, forcedestroy);
 		return result;
 	}
 
@@ -286,7 +289,7 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 			toss_up2(thrownobj);
 			return MM_MISS;
 		}
-		end_projectile(magr, mdef, thrownobj, launcher, fired, forcedestroy, &wepgone);
+		end_projectile(magr, mdef, thrownobj_p, launcher, fired, forcedestroy);
 		return MM_MISS;
 	}
 	else if (dz > 0) {
@@ -316,7 +319,7 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 			return MM_MISS;
 		}
 		/* Projectile hits floor. This calls end_projectile() */
-		hitfloor2(magr, thrownobj, launcher, fired, forcedestroy, &wepgone);
+		hitfloor2(magr, thrownobj_p, launcher, fired, forcedestroy);
 		return MM_MISS;
 	}
 
@@ -359,7 +362,7 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 			(inside_shop(bhitpos.x, bhitpos.y)) &&
 			(shkcatch(thrownobj, bhitpos.x, bhitpos.y))) {
 			/* shopkeeper caught it */
-			wepgone = TRUE;
+			thrownobj = NULL;
 			break;
 		}
 
@@ -377,7 +380,7 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 				mdef = u.usteed;
 			}
 
-			result = projectile_attack(magr, mdef, thrownobj, vpointer, hmoncode, &dx, &dy, &range, &initrange, forcedestroy, &wepgone);
+			result = projectile_attack(magr, mdef, thrownobj_p, vpointer, hmoncode, &dx, &dy, &range, &initrange, forcedestroy);
 
 			if (result)
 			{
@@ -416,19 +419,13 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 		if (levl[bhitpos.x + dx][bhitpos.y + dy].typ == IRONBARS &&
 			!m_at(bhitpos.x + dx, bhitpos.y + dy) && 
 			hits_bars(
-				/* object fired   */ &thrownobj,
+				/* object fired   */ thrownobj_p,
 				/* current coords */ bhitpos.x, bhitpos.y,
 				/* force hit?     */ Is_illregrd(&u.uz) || ((bhitpos.x == initx && bhitpos.y == inity) ? 0 : !rn2(5)),
 				/* player caused  */ (magr == &youmonst))
 			) {
-			if (!thrownobj)
-			{
-				wepgone = TRUE;
-			}
-			else
-			{
+			if (thrownobj)
 				do_digging_projectile(magr, thrownobj, dx, dy);
-			}
 			range = 0;
 		}
 
@@ -486,7 +483,7 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 	tmp_at(DISP_END, 0);
 
 	/* some artifacts magically return to the location they were thrown from */
-	if (returning && !wepgone) {
+	if (returning && thrownobj) {
 		/* show object's return flight */
 		sho_obj_return(thrownobj, initx, inity);
 		/* move it */
@@ -519,11 +516,11 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 							Tobjnam(thrownobj, Blind ? "hit" : "fly"),
 							body_part(ARM));
 						/* object now hits you -- ouch! */
-						(void)hmon_general(magr, magr, (struct attack *)0, (struct attack *)0, thrownobj, (void *)0, HMON_FIRED, 0, 0, TRUE, 0, FALSE, -1, &wepgone);
+						(void)hmon_general(magr, magr, (struct attack *)0, (struct attack *)0, thrownobj_p, (void *)0, HMON_FIRED, 0, 0, TRUE, 0, FALSE, -1);
 					}
 					/* end copy */
 				}
-				end_projectile(magr, mdef, thrownobj, launcher, fired, forcedestroy, &wepgone);
+				end_projectile(magr, mdef, thrownobj_p, launcher, fired, forcedestroy);
 			}
 			return result;
 		}
@@ -531,7 +528,7 @@ boolean impaired;				/* TRUE if throwing/firing slipped OR magr is confused/stun
 	}
 
 	/* end the projectile */
-	end_projectile(magr, mdef, thrownobj, launcher, fired, forcedestroy, &wepgone);
+	end_projectile(magr, mdef, thrownobj_p, launcher, fired, forcedestroy);
 	return result;
 }
 
@@ -730,22 +727,20 @@ struct obj * thrownobj;			/* Projectile object. Must be free. Will no longer exi
  * [thrownobj] may have been destroyed already -- if so, we just return early, as there's nothing to do
  */
 void
-end_projectile(magr, mdef, thrownobj, launcher, fired, forcedestroy, wepgone)
+end_projectile(magr, mdef, thrownobj_p, launcher, fired, forcedestroy)
 struct monst * magr;			/* Creature responsible for the projectile. Might not exist. */
 struct monst * mdef;			/* Creature hit by the projectile. Might not exist. */
-struct obj * thrownobj;			/* Projectile object. Must be free. At this point, might not exist. */
+struct obj ** thrownobj_p;		/* Pointer to: Projectile object. Must be free. At this point, might not exist. */
 struct obj * launcher;			/* Launcher for the projectile. Can be non-existant. Implies "fired" is true. */
 boolean fired;					/* Whether or not the projectile was fired (ex arrow from a bow). Fired without a launcher is possible (ex AT_ARRW). */
 boolean forcedestroy;			/* If TRUE, make sure the projectile is destroyed */
-boolean * wepgone;				/* TRUE if projectile is already destroyed */
 {
 	boolean youagr = (magr && (magr == &youmonst));
+	struct obj * thrownobj = (thrownobj_p) ? *(thrownobj_p) : (struct obj *)0;
 
 	/* need to check that thrownobj hasn't been dealt with already */
-	if (*wepgone)
-	{
+	if (!thrownobj)
 		return;
-	}
 
 	/* projectiles that never survive being fired; their special effects are handled in destroy_projectile() */
 	if (fired && (
@@ -756,7 +751,7 @@ boolean * wepgone;				/* TRUE if projectile is already destroyed */
 		))
 	{
 		destroy_projectile(magr, thrownobj);
-		*wepgone = TRUE;
+		*thrownobj_p = NULL;
 		return;
 	}
 
@@ -782,7 +777,7 @@ boolean * wepgone;				/* TRUE if projectile is already destroyed */
 		else {
 			destroy_projectile(magr, thrownobj);
 		}
-		*wepgone = TRUE;
+		*thrownobj_p = NULL;
 		return;
 	}
 
@@ -797,12 +792,12 @@ boolean * wepgone;				/* TRUE if projectile is already destroyed */
 			if (is_animal(u.ustuck->data) &&
 				thrownobj->otyp == CORPSE) {
 				obfree(thrownobj, 0);
-				*wepgone = TRUE;
+				*thrownobj_p = NULL;
 				return;
 			}
 			else {
 				mpickobj(u.ustuck, thrownobj);
-				*wepgone = TRUE;
+				*thrownobj_p = NULL;
 				return;
 			}
 		}
@@ -813,7 +808,7 @@ boolean * wepgone;				/* TRUE if projectile is already destroyed */
 			if (mdef && is_animal(mdef->data) &&
 				thrownobj->otyp == CORPSE) {
 				obfree(thrownobj, 0);
-				*wepgone = TRUE;
+				*thrownobj_p = NULL;
 				return;
 			}
 			/* else go through the rest of the function */
@@ -832,21 +827,21 @@ boolean * wepgone;				/* TRUE if projectile is already destroyed */
 		/* Nudzirath effects */
 		if (youagr && is_shatterable(thrownobj) && !thrownobj->oerodeproof && u.specialSealsActive&SEAL_NUDZIRATH) {
 			nudzirath_shatter(thrownobj, bhitpos.x, bhitpos.y);
-			*wepgone = TRUE;
+			*thrownobj_p = NULL;
 		}
 
 		tmp_at(DISP_END, 0);
-		if (!(*wepgone)) {
+		if (*thrownobj_p) {
 			breakmsg(thrownobj, cansee(bhitpos.x, bhitpos.y));
 			breakobj(thrownobj, bhitpos.x, bhitpos.y, youagr, TRUE);
-			*wepgone = TRUE;
+			*thrownobj_p = NULL;
 		}
 		return;
 	}
 
 	/* do floor effects (like lava) -- if it returned true the item was destroyed */
 	if (flooreffects(thrownobj, bhitpos.x, bhitpos.y, "fall")) {
-		*wepgone = TRUE;
+		*thrownobj_p = NULL;
 		return;
 	}
 	
@@ -861,7 +856,7 @@ boolean * wepgone;				/* TRUE if projectile is already destroyed */
 		if (*u.ushops)
 			check_shop_obj(thrownobj, bhitpos.x, bhitpos.y, FALSE);
 		(void)mpickobj(mdef, thrownobj);	/* may merge and free obj */
-		*wepgone = TRUE;
+		*thrownobj_p = NULL;
 		return;
 	}
 
@@ -874,7 +869,7 @@ boolean * wepgone;				/* TRUE if projectile is already destroyed */
 
 	/* if there wasn't a creature at the projectile's hitspot, it might fall down the stairs */
 	if (!mdef && ship_object(thrownobj, bhitpos.x, bhitpos.y, FALSE)) {
-		*wepgone = TRUE;
+		*thrownobj_p = NULL;
 		return;
 	}
 
@@ -915,26 +910,28 @@ boolean * wepgone;				/* TRUE if projectile is already destroyed */
  * 
  */
 void
-hitfloor2(magr, obj, launcher, fired, forcedestroy, wepgone)
+hitfloor2(magr, obj_p, launcher, fired, forcedestroy)
 struct monst * magr;
-struct obj * obj;
+struct obj ** obj_p;
 struct obj * launcher;
 boolean fired;
 boolean forcedestroy;
-boolean * wepgone;
 {
 	boolean youagr = (magr == &youmonst);
 
+	if (!(*obj_p))
+		return;
+
 	/* specific effects before end_projectile, if thrownobj still exists */
-	if (!(*wepgone) && youagr) {
+	if (youagr) {
 		if (IS_ALTAR(levl[bhitpos.x][bhitpos.y].typ))
-			doaltarobj(obj);
+			doaltarobj((*obj_p));
 		else
-			pline("%s hit%s the %s.", Doname2(obj),
-			(obj->quan == 1L) ? "s" : "", surface(bhitpos.x, bhitpos.y));
+			pline("%s hit%s the %s.", Doname2((*obj_p)),
+			((*obj_p)->quan == 1L) ? "s" : "", surface(bhitpos.x, bhitpos.y));
 	}
 	/* end projectile*/
-	end_projectile(magr, (struct monst *)0, obj, launcher, fired, forcedestroy, wepgone);
+	end_projectile(magr, (struct monst *)0, obj_p, launcher, fired, forcedestroy);
 	return;
 }
 
@@ -948,10 +945,10 @@ boolean * wepgone;
  *  
  */
 int
-projectile_attack(magr, mdef, thrownobj, vpointer, hmoncode, pdx, pdy, prange, prange2, forcedestroy, wepgone)
+projectile_attack(magr, mdef, thrownobj_p, vpointer, hmoncode, pdx, pdy, prange, prange2, forcedestroy)
 struct monst * magr;			/* Creature responsible for the projectile. Can be non-existant. */
 struct monst * mdef;			/* Creature under fire. */
-struct obj * thrownobj;			/* Projectile object. Must be free. */
+struct obj ** thrownobj_p;		/* Projectile object. Must be free. */
 void * vpointer;				/* additional /whatever/, type based on hmoncode. */
 int hmoncode;					/* what kind of pointer is vpointer, and what is it doing? (hack.h) */
 int * pdx;						/* pointer to: x; Direction of projectile's movement */
@@ -959,7 +956,6 @@ int * pdy;						/* pointer to: y; Direction of projectile's movement */
 int * prange;					/* pointer to: Remaining range for projectile */
 int * prange2;					/* pointer to: Remaining 2x range for projectile */
 boolean forcedestroy;			/* TRUE if projectile should be forced to be destroyed at the end */
-boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 {
 	int dx		= *pdx;
 	int dy		= *pdy;
@@ -969,6 +965,7 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 	boolean youdef = (mdef == &youmonst);
 	struct permonst * pa = magr ? (youagr ? youracedata : magr->data) : (struct permonst *)0;
 	struct permonst * pd = youdef ? youracedata : mdef->data;
+	struct obj * thrownobj = (thrownobj_p) ? (*thrownobj_p) : (struct obj *)0;
 
 	boolean misfired = (hmoncode & HMON_MISTHROWN);
 	boolean fired = (hmoncode & HMON_FIRED);
@@ -1009,9 +1006,9 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 		if (!(Fumbling || (!thrownobj->oartifact && rn2(18) >= ACURR(A_DEX)))) {
 			/* we catch it */
 			You("skillfully catch the %s.", xname(thrownobj));
-			*wepgone = TRUE;
 			exercise(A_DEX, TRUE);
 			return_thrownobj(&youmonst, thrownobj);
+			*thrownobj_p = NULL;
 			return MM_HIT;
 		}
 		/* else do the rest of the function, ouch! */
@@ -1076,7 +1073,7 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 	){
 		You("burn %s out of the %s!", doname(thrownobj), (Underwater || Is_waterlevel(&u.uz)) ? "water" : "air");
 		obfree(thrownobj, (struct obj*) 0);
-		*wepgone = TRUE;
+		*thrownobj_p = NULL;
 		return MM_HIT;
 	}
 
@@ -1098,7 +1095,7 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 					"You catch, but drop, %s.", xname(thrownobj),
 					"You catch:");
 			}
-			*wepgone = TRUE;
+			*thrownobj_p = NULL;
 			return MM_HIT;
 		}
 		else if(youagr)
@@ -1114,7 +1111,7 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 					pline("%s catches %s.", Monnam(mdef), the(xname(thrownobj)));
 				}
 				if (gem_accept(mdef, thrownobj)) {
-					*wepgone = TRUE;
+					*thrownobj_p = NULL;
 					return MM_HIT;
 				}
 					
@@ -1132,8 +1129,8 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 		mdef->msleeping = 0;
 		mdef->mstrategy &= ~STRAT_WAITMASK;
 		if (mdef->mcanmove) {
-			quest_art_swap(thrownobj, mdef, wepgone);
-			*wepgone = TRUE;
+			quest_art_swap(thrownobj_p, mdef);
+			*thrownobj_p = NULL;
 			return MM_HIT;
 		}
 		else {
@@ -1165,7 +1162,7 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 			}
 			m_dowear(mdef, FALSE);
 			newsym(x(mdef), y(mdef));
-			*wepgone = TRUE;
+			*thrownobj_p = NULL;
 			return MM_HIT;
 		}
 	}
@@ -1175,7 +1172,7 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 		(mdef->mtame && dogfood(mdef, thrownobj) <= 2)) {	/* 2 <=> ACCFOOD */
 		if (tamedog(mdef, thrownobj))
 		{
-			*wepgone = TRUE;
+			*thrownobj_p = NULL;
 			return MM_HIT;           	/* obj is gone */
 		}
 		else {
@@ -1189,7 +1186,8 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 	/* gold -- youdef is you throwing gold upwards and it falling back down */
 	if (!youdef && thrownobj->oclass == COIN_CLASS && !(youagr && u.uswallow))
 	{
-		*wepgone = ghitm(mdef, thrownobj);
+		if(ghitm(mdef, thrownobj))
+			*thrownobj_p = NULL;
 		return MM_HIT;
 	}
 
@@ -1206,8 +1204,8 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 			exercise(A_DEX, TRUE);
 		/* call hmon to make the projectile hit */
 		/* hmon will do hitmsg */
-		result = hmon_general(magr, mdef, &dummy, &dummy, thrownobj, vpointer, hmoncode, 0, 0, TRUE, dieroll, FALSE, vis, wepgone);
-
+		result = hmon_general(magr, mdef, &dummy, &dummy, thrownobj_p, vpointer, hmoncode, 0, 0, TRUE, dieroll, FALSE, vis);
+		thrownobj = *thrownobj_p;
 		/* wake up defender */
 		wakeup2(mdef, youagr);
 
@@ -1218,7 +1216,7 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 			hot_pursuit(mdef);
 
 		/* deal with projectile */
-		if (*wepgone) {
+		if (!thrownobj) {
 			/*hmon destroyed it, we're already done*/;
 		}
 		else 
@@ -1267,8 +1265,8 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 				if (youdef && thrownobj->otyp == LOADSTONE && !rn2(3))
 				{
 					broken = FALSE;
-					*wepgone = TRUE;
 					pickup_object(thrownobj, 1, TRUE);
+					*thrownobj_p = NULL;
 					result |= MM_HIT;
 				}
 			}
@@ -1279,7 +1277,7 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 				}
 				//#ifdef FIREARMS
 				destroy_projectile(magr, thrownobj);
-				*wepgone = TRUE;
+				*thrownobj_p = NULL;
 
 				/* check if explosions changed result */
 				if (*hp(mdef) <= 0)
@@ -1357,11 +1355,11 @@ boolean * wepgone;				/* pointer to: TRUE if projectile has been destroyed */
 }
 
 void
-quest_art_swap(obj, mon, swapped)
-struct obj * obj;
+quest_art_swap(obj_p, mon)
+struct obj ** obj_p;
 struct monst * mon;
-boolean * swapped;
 {
+	struct obj * obj = *obj_p;
 	/* don't make game unwinnable if naive player throws artifact
 	at leader.... */
 	pline("%s catches %s.", Monnam(mon), the(xname(obj)));
@@ -1371,8 +1369,8 @@ boolean * swapped;
 			if (obj->oartifact == ART_PALANTIR_OF_WESTERNESSE &&
 				yn("If you prefer, we can use the Palantir to secure the city, and you can use my bow in your travels.") == 'y'
 				){
-				*swapped = TRUE;
 				obfree(obj, (struct obj *)0);
+				*obj_p = NULL;
 				obj = mksobj(ELVEN_BOW, TRUE, FALSE);
 				obj = oname(obj, artiname(ART_BELTHRONDING));
 				obj->oerodeproof = TRUE;
@@ -1399,8 +1397,8 @@ boolean * swapped;
 			if (obj->oartifact == ART_SILVER_STARLIGHT && quest_status.got_thanks && mon->mtyp == PM_ECLAVDRA &&
 				yn("Do you wish to take the Wrathful Spider, instead of this?") == 'y'
 				){
-				*swapped = TRUE;
 				obfree(obj, (struct obj *)0);
+				*obj_p = NULL;
 				obj = mksobj(DROVEN_CROSSBOW, TRUE, FALSE);
 				obj = oname(obj, artiname(ART_WRATHFUL_SPIDER));
 				obj->oerodeproof = TRUE;
@@ -1417,8 +1415,8 @@ boolean * swapped;
 			else if (obj->oartifact == ART_TENTACLE_ROD && quest_status.got_thanks && mon->mtyp == PM_SEYLL_AUZKOVYN &&
 				yn("Do you wish to take the Crescent Blade, instead of this?") == 'y'
 				){
-				*swapped = TRUE;
 				obfree(obj, (struct obj *)0);
+				*obj_p = NULL;
 				obj = mksobj(SABER, TRUE, FALSE);
 				obj = oname(obj, artiname(ART_CRESCENT_BLADE));
 				obj->oerodeproof = TRUE;
@@ -1435,8 +1433,8 @@ boolean * swapped;
 			else if (obj->oartifact == ART_DARKWEAVER_S_CLOAK && quest_status.got_thanks && mon->mtyp == PM_ECLAVDRA &&
 				yn("Do you wish to take Spidersilk, instead of this?") == 'y'
 				){
-				*swapped = TRUE;
 				obfree(obj, (struct obj *)0);
+				*obj_p = NULL;
 				obj = mksobj(DROVEN_CHAIN_MAIL, TRUE, FALSE);
 				obj = oname(obj, artiname(ART_SPIDERSILK));
 				obj->oerodeproof = TRUE;
@@ -1453,8 +1451,8 @@ boolean * swapped;
 			else if (obj->oartifact == ART_TENTACLE_ROD && quest_status.got_thanks && mon->mtyp == PM_DARUTH_XAXOX &&
 				yn("Do you wish to take the Webweaver's Crook, instead of this?") == 'y'
 				){
-				*swapped = TRUE;
 				obfree(obj, (struct obj *)0);
+				*obj_p = NULL;
 				obj = mksobj(FAUCHARD, TRUE, FALSE);
 				obj = oname(obj, artiname(ART_WEBWEAVER_S_CROOK));
 				obj->oerodeproof = TRUE;
@@ -1594,7 +1592,6 @@ toss_up2(obj)
 struct obj *obj;
 {
 	char buf[BUFSZ];
-	boolean wepgone = FALSE;
 	/* note: obj->quan == 1 */
 
 	if (In_outdoors(&u.uz)) {
@@ -1616,7 +1613,7 @@ struct obj *obj;
 	}
 	if (insubstantial(youracedata) && !hits_insubstantial((struct monst *)0, &youmonst, (struct attack *)0, obj)) {
 		pline("%s %s, then falls back down through you.", Doname2(obj), buf);
-		hitfloor2(&youmonst, obj, (struct obj *)0, FALSE, FALSE, &wepgone);
+		hitfloor2(&youmonst, &obj, (struct obj *)0, FALSE, FALSE);
 	}
 	else {
 		pline("%s %s, then falls back down towards your %s.",
@@ -1979,10 +1976,6 @@ dofire()
 	int shotlimit = 0;
 	char *oldsave_cm = save_cm;
 
-	if (notake(youracedata)) {	/* this will need adjusting when 'f' automatically does AT_SPIT etc */
-		You("are physically incapable of doing that.");
-		return 0;
-	}
 	if (check_capacity((char *)0))
 		return 0;
 
@@ -2000,209 +1993,245 @@ dofire()
 	multi = 0;		/* reset; it's been used up */
 
 
-	/* Fire loaded launchers and blasters */
-	if ((uwep     && ((uquiver && ammo_and_launcher(uquiver, uwep    )) || is_blaster(uwep    ))) ||
-		(uswapwep && ((uquiver && ammo_and_launcher(uquiver, uswapwep)) || is_blaster(uswapwep)) && u.twoweap)
-		)
-	{
-		struct obj * launcher;
-		int hand;
+	/* __ You have something ready to fire __ */
+	if (!notake(youracedata)) {
+		/* Fire loaded launchers and blasters */
+		if ((uwep && ((uquiver && ammo_and_launcher(uquiver, uwep)) || is_blaster(uwep))) ||
+			(uswapwep && ((uquiver && ammo_and_launcher(uquiver, uswapwep)) || is_blaster(uswapwep)) && u.twoweap)
+			)
+		{
+			struct obj * launcher;
+			int hand;
 
-		/* verify twoweapon status */
-		if (u.twoweap && !test_twoweapon())
-			untwoweapon();
+			/* verify twoweapon status */
+			if (u.twoweap && !test_twoweapon())
+				untwoweapon();
 
-		/* do mainhand, then offhand (if twoweaponing) */
-		for (hand = 0; hand < (u.twoweap ? 2 : 1); hand++) {
-			launcher = (!hand ? uwep : uswapwep);
-			if (!launcher || !((uquiver && ammo_and_launcher(uquiver, launcher)) || is_blaster(launcher)))
-				continue;
+			/* do mainhand, then offhand (if twoweaponing) */
+			for (hand = 0; hand < (u.twoweap ? 2 : 1); hand++) {
+				launcher = (!hand ? uwep : uswapwep);
+				if (!launcher || !((uquiver && ammo_and_launcher(uquiver, launcher)) || is_blaster(launcher)))
+					continue;
 
-			if (uquiver && ammo_and_launcher(uquiver, launcher)) {
-				/* simply fire uquiver from the launcher */
-				result += uthrow(uquiver, launcher, shotlimit, FALSE);
-			}
-			else if (is_blaster(launcher)) {
-				/* blasters need to generate their ammo on the fly */
-				struct obj * ammo = (struct obj *)0;
-
-				/* do we have enough charge to fire? */
-				if (!launcher->ovar1) {
-					if (launcher->otyp == RAYGUN) You("push the firing stud, but nothing happens.");
-					else pline("Nothing happens when you pull the trigger.");
-					/* nothing else happens */
+				if (uquiver && ammo_and_launcher(uquiver, launcher)) {
+					/* simply fire uquiver from the launcher */
+					result += uthrow(uquiver, launcher, shotlimit, FALSE);
 				}
-				else {
-					switch (launcher->otyp) {
-					case CUTTING_LASER:
-					case HAND_BLASTER:
-					case ARM_BLASTER:
-					case MASS_SHADOW_PISTOL:
-						ammo = blaster_ammo(launcher);
-						break;
-					case RAYGUN:
-						/* create fake ammo in order to calculate multishot correctly */
-						ammo = blaster_ammo(launcher);
-						if (getdir((char *)0))
-							result += zap_raygun(launcher, calc_multishot(&youmonst, ammo, launcher, shotlimit), shotlimit);
-						/* destroy ammo and don't go through uthrow */
-						obfree(ammo, 0);
-						ammo = (struct obj *)0;
-						break;
-					default:
-						impossible("Unhandled blaster %d!", launcher->otyp);
-						break;
-					}
-					/* always destroy ammo fired from a blaster */
-					if (ammo) {
-						if (launcher->otyp == MASS_SHADOW_PISTOL)
-							ammo->ovar1 = -P_FIREARM;	/* special case to use FIREARM skill instead of SLING */
+				else if (is_blaster(launcher)) {
+					/* blasters need to generate their ammo on the fly */
+					struct obj * ammo = (struct obj *)0;
 
-						result += uthrow(ammo, launcher, shotlimit, TRUE);
-						/* and now delete the ammo object we created */
-						obfree(ammo, 0);
-					}
-				}
-			}
-		}
-		return (result > 0);
-	}
-
-	/* Throw quivered throwing weapons */
-	if (uquiver && throwing_weapon(uquiver)) {
-		return uthrow(uquiver, (struct obj *)0, shotlimit, FALSE);
-	}
-
-	/* Throw wielded weapon -- mainhand only */
-	if ((uwep && (!uquiver || (is_ammo(uquiver) && !ammo_and_launcher(uquiver, uwep)))) && (
-		(uwep->oartifact == ART_KHAKKHARA_OF_THE_MONKEY) ||
-		(uwep->oartifact == ART_MJOLLNIR && Role_if(PM_VALKYRIE) && ACURR(A_STR) == STR19(25)) ||
-		(uwep->oartifact == ART_ANNULUS && (uwep->otyp == CHAKRAM || uwep->otyp == LIGHTSABER)) ||
-		(uwep->oartifact == ART_AXE_OF_THE_DWARVISH_LORDS && Race_if(PM_DWARF) && ACURR(A_STR) == STR19(25)) ||
-		(!is_blaster(uwep) && uandroid)
-		// (uwep->oartifact == ART_SICKLE_MOON)
-		)) {
-		return uthrow(uwep, (struct obj *)0, shotlimit, FALSE);
-	}
-
-	/* Holy Moonlight Sword's magic blast -- mainhand only */
-	if (uwep && uwep->oartifact == ART_HOLY_MOONLIGHT_SWORD && uwep->lamplit && u.uen >= 25){
-		int dmg = d(2, 12) + 2 * uwep->spe;
-		int range = (Double_spell_size) ? 6 : 3;
-		xchar lsx, lsy, sx, sy;
-		struct monst *mon;
-		sx = u.ux;
-		sy = u.uy;
-		if (!getdir((char *)0) || !(u.dx || u.dy)) return 0;
-		losepw(25);
-		/* also swing in the direction chosen */
-		flags.forcefight = 1;
-		domove();
-		flags.forcefight = 0;
-
-		if (u.uswallow){
-			explode(u.ux, u.uy, AD_MAGM, WAND_CLASS, (d(2, 12) + 2 * uwep->spe) * ((Double_spell_size) ? 3 : 2) / 2, EXPL_CYAN, 1 + !!Double_spell_size);
-			return 1;
-		}
-		else {
-			while (--range >= 0){
-				lsx = sx; sx += u.dx;
-				lsy = sy; sy += u.dy;
-				if (isok(sx, sy) && isok(lsx, lsy) && !IS_STWALL(levl[sx][sy].typ)) {
-					mon = m_at(sx, sy);
-					if (mon){
-						explode(sx, sy, AD_MAGM, WAND_CLASS, dmg * ((Double_spell_size) ? 3 : 2) / 2, EXPL_CYAN, 1 + !!Double_spell_size);
-						break;//break loop
+					/* do we have enough charge to fire? */
+					if (!launcher->ovar1) {
+						if (launcher->otyp == RAYGUN) You("push the firing stud, but nothing happens.");
+						else pline("Nothing happens when you pull the trigger.");
+						/* nothing else happens */
 					}
 					else {
-						tmp_at(DISP_BEAM, cmap_to_glyph(S_digbeam));
-						tmp_at(sx, sy);
-						if (cansee(sx, sy)) delay_output();
-						tmp_at(DISP_END, 0);
+						switch (launcher->otyp) {
+						case CUTTING_LASER:
+						case HAND_BLASTER:
+						case ARM_BLASTER:
+						case MASS_SHADOW_PISTOL:
+							ammo = blaster_ammo(launcher);
+							break;
+						case RAYGUN:
+							/* create fake ammo in order to calculate multishot correctly */
+							ammo = blaster_ammo(launcher);
+							if (getdir((char *)0))
+								result += zap_raygun(launcher, calc_multishot(&youmonst, ammo, launcher, shotlimit), shotlimit);
+							/* destroy ammo and don't go through uthrow */
+							obfree(ammo, 0);
+							ammo = (struct obj *)0;
+							break;
+						default:
+							impossible("Unhandled blaster %d!", launcher->otyp);
+							break;
+						}
+						/* always destroy ammo fired from a blaster */
+						if (ammo) {
+							if (launcher->otyp == MASS_SHADOW_PISTOL)
+								ammo->ovar1 = -P_FIREARM;	/* special case to use FIREARM skill instead of SLING */
+
+							result += uthrow(ammo, launcher, shotlimit, TRUE);
+							/* and now delete the ammo object we created */
+							obfree(ammo, 0);
+						}
 					}
 				}
-				else {
-					explode(lsx, lsy, AD_MAGM, WAND_CLASS, dmg * ((Double_spell_size) ? 3 : 2) / 2, EXPL_CYAN, 1 + !!Double_spell_size);
-					break;//break loop
-				}
 			}
-			return 1;
+			return (result > 0);
 		}
-	}
 
-	/* Rogue Gear Spirits' auto-generated ammo -- mainhand only */
-	if (uwep && (!uquiver || (is_ammo(uquiver) && !ammo_and_launcher(uquiver, uwep))) && uwep->oartifact == ART_ROGUE_GEAR_SPIRITS){
-		struct obj *bolt = mksobj(CROSSBOW_BOLT, FALSE, FALSE);
-		bolt->spe = min(0, uwep->spe);
-		bolt->blessed = uwep->blessed;
-		bolt->cursed = uwep->cursed;
-		bolt->objsize = MZ_SMALL;
-		bolt->quan = 3;		/* Make more than enough so that we are always able to manually destroy the excess */
-		fix_object(bolt);
-		result = uthrow(bolt, uwep, shotlimit, TRUE);
-		obfree(bolt, 0);
-		return result;
-	}
-
-	/* TODO: intrinsic monster firing (like a manticore's spikes) */
-
-	/* Throw any old garbage we have quivered */
-	if (uquiver) {
-		return uthrow(uquiver, (struct obj *)0, shotlimit, FALSE);
-	}
-	else {
-		/* We don't have anything that should be done automatically at this point. */
-		if (!flags.autoquiver) {
-			/* Don't automatically fill the quiver */
-			You("have no ammunition readied!");
-			if (iflags.quiver_fired)
-				dowieldquiver(); /* quiver_fired */
-			if (!uquiver)
-				return(dothrow());
+		/* Throw quivered throwing weapons */
+		if (uquiver && throwing_weapon(uquiver)) {
+			return uthrow(uquiver, (struct obj *)0, shotlimit, FALSE);
 		}
-		else {
-			autoquiver();
-			if (!uquiver) {
-				You("have nothing appropriate for your quiver!");
-				return(dothrow());
+
+		/* Throw wielded weapon -- mainhand only */
+		if ((uwep && (!uquiver || (is_ammo(uquiver) && !ammo_and_launcher(uquiver, uwep)))) && (
+			(uwep->oartifact == ART_KHAKKHARA_OF_THE_MONKEY) ||
+			(uwep->oartifact == ART_MJOLLNIR && Role_if(PM_VALKYRIE) && ACURR(A_STR) == STR19(25)) ||
+			(uwep->oartifact == ART_ANNULUS && (uwep->otyp == CHAKRAM || uwep->otyp == LIGHTSABER)) ||
+			(uwep->oartifact == ART_AXE_OF_THE_DWARVISH_LORDS && Race_if(PM_DWARF) && ACURR(A_STR) == STR19(25)) ||
+			(!is_blaster(uwep) && uandroid)
+			// (uwep->oartifact == ART_SICKLE_MOON)
+			)) {
+			return uthrow(uwep, (struct obj *)0, shotlimit, FALSE);
+		}
+
+		/* Holy Moonlight Sword's magic blast -- mainhand only */
+		if (uwep && uwep->oartifact == ART_HOLY_MOONLIGHT_SWORD && uwep->lamplit && u.uen >= 25){
+			int dmg = d(2, 12) + 2 * uwep->spe;
+			int range = (Double_spell_size) ? 6 : 3;
+			xchar lsx, lsy, sx, sy;
+			struct monst *mon;
+			sx = u.ux;
+			sy = u.uy;
+			if (!getdir((char *)0) || !(u.dx || u.dy)) return 0;
+			losepw(25);
+			/* also swing in the direction chosen */
+			flags.forcefight = 1;
+			domove();
+			flags.forcefight = 0;
+
+			if (u.uswallow){
+				explode(u.ux, u.uy, AD_MAGM, WAND_CLASS, (d(2, 12) + 2 * uwep->spe) * ((Double_spell_size) ? 3 : 2) / 2, EXPL_CYAN, 1 + !!Double_spell_size);
+				return 1;
 			}
 			else {
-				You("fill your quiver:");
-				prinv((char *)0, uquiver, 0L);
+				while (--range >= 0){
+					lsx = sx; sx += u.dx;
+					lsy = sy; sy += u.dy;
+					if (isok(sx, sy) && isok(lsx, lsy) && !IS_STWALL(levl[sx][sy].typ)) {
+						mon = m_at(sx, sy);
+						if (mon){
+							explode(sx, sy, AD_MAGM, WAND_CLASS, dmg * ((Double_spell_size) ? 3 : 2) / 2, EXPL_CYAN, 1 + !!Double_spell_size);
+							break;//break loop
+						}
+						else {
+							tmp_at(DISP_BEAM, cmap_to_glyph(S_digbeam));
+							tmp_at(sx, sy);
+							if (cansee(sx, sy)) delay_output();
+							tmp_at(DISP_END, 0);
+						}
+					}
+					else {
+						explode(lsx, lsy, AD_MAGM, WAND_CLASS, dmg * ((Double_spell_size) ? 3 : 2) / 2, EXPL_CYAN, 1 + !!Double_spell_size);
+						break;//break loop
+					}
+				}
+				return 1;
+			}
+		}
+
+		/* Rogue Gear Spirits' auto-generated ammo -- mainhand only */
+		if (uwep && (!uquiver || (is_ammo(uquiver) && !ammo_and_launcher(uquiver, uwep))) && uwep->oartifact == ART_ROGUE_GEAR_SPIRITS){
+			struct obj *bolt = mksobj(CROSSBOW_BOLT, FALSE, FALSE);
+			bolt->spe = min(0, uwep->spe);
+			bolt->blessed = uwep->blessed;
+			bolt->cursed = uwep->cursed;
+			bolt->objsize = MZ_SMALL;
+			bolt->quan = 3;		/* Make more than enough so that we are always able to manually destroy the excess */
+			fix_object(bolt);
+			result = uthrow(bolt, uwep, shotlimit, TRUE);
+			obfree(bolt, 0);
+			return result;
+		}
+	}/* !notake */
+
+	if (attacktype(youracedata, AT_BREA))
+		return dobreathe(youracedata);
+
+	if (attacktype(youracedata, AT_SPIT))
+		return dospit();
+
+	if (attacktype(youracedata, AT_ARRW)) {
+		struct attack * attk = attacktype_fordmg(youracedata, AT_ARRW, AD_ANY);
+		int n;
+		if (getdir((char *)0)) {
+			/* actually have to message in this function */
+			You("shoot!");
+			/* fire d(n,d) projectiles */
+			for (n = d(attk->damn, attk->damd); n > 0; n--)
+				result |= xfirey(&youmonst, attk, 0, 0);
+
+			if (result) {
+				return 1;
+			}
+			else {
+				/* nothing shot, but we messaged, so we have to end here */
+				pline("...or not. Awkward.");
+				return 1;
 			}
 		}
 	}
 
-	/* Fire now-loaded launchers. We can ignore blasters, because that would have been caught above and didn't care about uquiver */
-	if ((uwep     && (uquiver && ammo_and_launcher(uquiver, uwep    ))) ||
-		(uswapwep && (uquiver && ammo_and_launcher(uquiver, uswapwep)))
-		)
-	{
-		struct obj * launcher;
-		int hand;
-		int result = 0;
-
-		/* verify twoweapon status */
-		if (u.twoweap && !test_twoweapon())
-			untwoweapon();
-
-		/* do mainhand, then offhand (if twoweaponing) */
-		for (hand = 0; hand < (u.twoweap ? 2 : 1); hand++) {
-			launcher = (!hand ? uwep : uswapwep);
-			if (!launcher || !(uquiver && ammo_and_launcher(uquiver, launcher)))
-				continue;
-
-			if (uquiver && ammo_and_launcher(uquiver, launcher)) {
-				/* simply fire uquiver from the launcher */
-				result += uthrow(uquiver, launcher, shotlimit, FALSE);
+	/* __ You didn't have anything good ready to fire __ */
+	if (!notake(youracedata)) {
+		/* Throw any old garbage we have quivered */
+		if (uquiver) {
+			return uthrow(uquiver, (struct obj *)0, shotlimit, FALSE);
+		}
+		else {
+			/* We don't have anything that should be done automatically at this point. */
+			if (!flags.autoquiver) {
+				/* Don't automatically fill the quiver */
+				You("have no ammunition readied!");
+				if (iflags.quiver_fired)
+					dowieldquiver(); /* quiver_fired */
+				if (!uquiver)
+					return(dothrow());
+			}
+			else {
+				autoquiver();
+				if (!uquiver) {
+					You("have nothing appropriate for your quiver!");
+					return(dothrow());
+				}
+				else {
+					You("fill your quiver:");
+					prinv((char *)0, uquiver, 0L);
+				}
 			}
 		}
-		return result;
+
+		/* Fire now-loaded launchers. We can ignore blasters, because that would have been caught above and didn't care about uquiver */
+		if ((uwep && (uquiver && ammo_and_launcher(uquiver, uwep))) ||
+			(uswapwep && (uquiver && ammo_and_launcher(uquiver, uswapwep)))
+			)
+		{
+			struct obj * launcher;
+			int hand;
+			int result = 0;
+
+			/* verify twoweapon status */
+			if (u.twoweap && !test_twoweapon())
+				untwoweapon();
+
+			/* do mainhand, then offhand (if twoweaponing) */
+			for (hand = 0; hand < (u.twoweap ? 2 : 1); hand++) {
+				launcher = (!hand ? uwep : uswapwep);
+				if (!launcher || !(uquiver && ammo_and_launcher(uquiver, launcher)))
+					continue;
+
+				if (uquiver && ammo_and_launcher(uquiver, launcher)) {
+					/* simply fire uquiver from the launcher */
+					result += uthrow(uquiver, launcher, shotlimit, FALSE);
+				}
+			}
+			return result;
+		}
+
+		/* Throw whaterver it was we quivered */
+		if (uquiver) {
+			return uthrow(uquiver, (struct obj *)0, shotlimit, FALSE);
+		}
 	}
 
-	/* Throw whaterver it was we quivered */
-	if (uquiver) {
-		return uthrow(uquiver, (struct obj *)0, shotlimit, FALSE);
+	/* print message if we were unable to fire anything due to our form */
+	if (notake(youracedata)) {
+		You("are physically incapable of doing that.");
 	}
 
 	/* Fall through: we did nothing */
@@ -2594,8 +2623,6 @@ boolean stoponhit;
  * 
  * magr is breathing at (tarx, tary)
  * 
- * The player's version is fairly separate, and is in polyself.c
- * TODO: make #monster use this function; add additional functionality to make that possible
  */
 boolean
 xbreathey(magr, attk, tarx, tary)
@@ -2619,10 +2646,13 @@ int tary;
 		dy = sgn(tary - y(magr));
 		dz = 0;
 	}
-	else {
+	else if (youagr) {
 		dx = u.dx;
 		dy = u.dy;
 		dz = u.dz;
+	}
+	else {
+		return FALSE;
 	}
 
 	/* Random breath attacks */
@@ -2662,6 +2692,16 @@ int tary;
 		}
 	}
 
+	/* player uses Pw to breathe instead of having a cooldown */
+	if (youagr) {
+		if (u.uen < 15) {
+			You("don't have enough energy to breathe!");
+			return(0);
+		}
+		losepw(15);
+		flags.botl = 1;
+	}
+
 	/* message */
 	if (youagr) {
 		You("breathe %s!", breathwep(typ));
@@ -2675,7 +2715,7 @@ int tary;
 	basiczap(&zapdata, typ, ZAP_BREATH, 0);
 
 	/* set dragonbreath if applicable*/
-	if (is_true_dragon(pa))
+	if (is_true_dragon(pa) || (youagr && Race_if(PM_HALF_DRAGON) && u.ulevel >= 14))
 		zapdata.unreflectable = ZAP_REFL_ADVANCED;
 	/* set damage */
 	zapdata.damn = attk->damn + min(MAX_BONUS_DICE, (mlev(magr) / 3));
@@ -2722,10 +2762,13 @@ int tary;
 		dy = sgn(tary - y(magr));
 		dz = 0;
 	}
-	else {
+	else if (youagr) {
 		dx = u.dx;
 		dy = u.dy;
 		dz = u.dz;
+	}
+	else {
+		return FALSE;
 	}
 
 	/* cancelled monsters can't spit */
@@ -2815,10 +2858,13 @@ int tary;
 		dy = sgn(tary - y(magr));
 		dz = 0;
 	}
-	else {
+	else if (youagr) {
 		dx = u.dx;
 		dy = u.dy;
 		dz = u.dz;
+	}
+	else {
+		return FALSE;
 	}
 
 	switch (typ) {
@@ -2896,11 +2942,11 @@ int tary;
 		qvr = mksobj(ammo_type, FALSE, FALSE);
 		rngmod = 8;
 		/* volley -- inaccurate */
-		if		(tary == y(magr))
+		if		(!dx)
 			yadj = d(1, 3) - 2;
-		else if (tarx == x(magr))
+		else if (!dy)
 			xadj = d(1, 3) - 2;
-		else if (tarx - x(magr) == tary - y(magr)){
+		else if (dx == dy*-1) {
 			xadj = d(1, 3) - 2;
 			yadj = -1 * xadj;
 		}
@@ -2922,9 +2968,28 @@ int tary;
 			return FALSE; 
 	}
 
-	/* check that attacker is in range of target */
-	if (BOLT_LIM + rngmod < distmin(x(magr), y(magr), tarx, tary))
-		return FALSE;
+	/* if the player is using this function, tarx/tary don't exist, which is a problem for portal_projectile */
+	if (youagr && portal_projectile && !(tarx || tary) && (dx || dy)) {
+		struct monst * mdef;
+		tarx = u.ux;
+		tary = u.uy;
+		while (TRUE){ //Exits via break, phase through walls.
+			tarx += dx;
+			tary += dy;
+			if (isok(tarx, tary) && may_passwall(tarx, tary)) {
+				mdef = m_at(tarx, tary);
+				/* reveal/unreveal invisible monsters before tmp_at() */
+				if (mdef && !canspotmon(mdef) && cansee(tarx, tary))
+					map_invisible(tarx, tary);
+				else if (!mdef && glyph_is_invisible(levl[tarx][tary].glyph)) {
+					unmap_object(tarx, tary);
+					newsym(tarx, tary);
+				}
+				if (mdef) break;
+			}
+			else break;
+		}
+	}
 
 	/* don't message here , because this function is often called several times :( */
 

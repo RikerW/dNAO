@@ -11,13 +11,6 @@
 #include "artifact.h"
 #include "hack.h"
 
-
-#ifdef OVLB
-#include "artilist.h"
-#else
-STATIC_DCL struct artifact artilist[];
-#endif
-
 #ifdef DUMP_LOG
 STATIC_DCL int FDECL(enhance_skill, (boolean));
 #endif
@@ -496,11 +489,11 @@ int otyp;
 			if (large)
 			{
 				bonn = 1;
-				bond = max(12 + 2 * dmod, 2);
+				bond = max(10 + 2 * dmod, 2);
 			}
 			else
 			{
-				flat += max(12 + 2 * dmod, 2);
+				flat += max(10 + 2 * dmod, 2);
 			}
 		}
 		else if (obj->oartifact == ART_GREEN_DRAGON_CRESCENT_BLAD){
@@ -527,11 +520,10 @@ int otyp;
 			bond = 4;
 		}
 		else if (obj->oartifact == ART_LIECLEAVER) {
-			ocn = 1;	/* plus another 1d10 from being an artifact */
+			ocn = 1;
 			ocd = 10;
-			bonn = 2;
+			bonn = 1;
 			bond = 12;
-			spe_mult = 2;
 		}
 		else if (obj->oartifact == ART_WAND_OF_ORCUS) {
 			ocn = 1;
@@ -1180,8 +1172,7 @@ int spot;
 	for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) {
 	    if (otmp->otyp == x &&
 		    /* never select non-cockatrice corpses */
-		    !((x == CORPSE || x == EGG) &&
-			!touch_petrifies(&mons[otmp->corpsenm])) &&
+		    !((x == CORPSE || x == EGG) && (otmp->corpsenm == NON_PM || !touch_petrifies(&mons[otmp->corpsenm]))) &&
 			/* never uncharged lightsabers */
             (!is_lightsaber(otmp) || otmp->age || otmp->oartifact == ART_INFINITY_S_MIRRORED_ARC || otmp->otyp == KAMEREL_VAJRA) &&
 			/* never offhand artifacts (unless you are the Bastard) */

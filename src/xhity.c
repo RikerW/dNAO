@@ -4,21 +4,6 @@
 
 #include "xhity.h"
 
-#ifdef OVLB
-#include "artilist.h"
-#else
-STATIC_DCL struct artifact artilist[];
-#endif
-
-/* TODO LIST
-
-MAJOR:
-
-MINOR:
-artifact hitmesages
-Claws of the Revenancer w/ rings
-*/
-
 STATIC_DCL void FDECL(wildmiss, (struct monst *, struct attack *, struct obj *, boolean));
 STATIC_DCL boolean FDECL(u_surprise, (struct monst *, boolean));
 STATIC_DCL struct attack * FDECL(getnextspiritattack, (boolean));
@@ -32,7 +17,7 @@ STATIC_DCL int FDECL(xcastmagicy, (struct monst *, struct monst *, struct attack
 STATIC_DCL int FDECL(xtinkery, (struct monst *, struct monst *, struct attack *, int));
 STATIC_DCL int FDECL(xengulfhurty, (struct monst *, struct monst *, struct attack *, int));
 STATIC_DCL int FDECL(xexplodey, (struct monst *, struct monst *, struct attack *, int));
-STATIC_DCL int FDECL(hmoncore, (struct monst *, struct monst *, struct attack *, struct attack *, struct obj *, void *, int, int, int, boolean, int, boolean, int, boolean *));
+STATIC_DCL int FDECL(hmoncore, (struct monst *, struct monst *, struct attack *, struct attack *, struct obj **, void *, int, int, int, boolean, int, boolean, int));
 STATIC_DCL int FDECL(shadow_strike, (struct monst *));
 STATIC_DCL int FDECL(xpassivehity, (struct monst *, struct monst *, struct attack *, struct attack *, struct obj *, int, int, struct permonst *, boolean));
 
@@ -230,7 +215,7 @@ struct monst * mdef;
 			return FALSE;
 		/* assumes the bloodthirst is caused by your mainhand weapon */
 		Your("bloodthirsty weapon attacks!");
-		result = xmeleehity(&youmonst, mdef, &basicattack, uwep, VIS_MAGR, 0, FALSE);
+		result = xmeleehity(&youmonst, mdef, &basicattack, &uwep, VIS_MAGR, 0, FALSE);
 	}
 	else {
 		result = xattacky(&youmonst, mdef, bhitpos.x, bhitpos.y);
@@ -688,6 +673,7 @@ int tary;
 						&& !(otmp->oartifact && !always_twoweapable_artifact(otmp))			// ok artifact
 						&& (!bimanual(otmp, pa) || pa->mtyp == PM_GYNOID || pa->mtyp == PM_PARASITIZED_GYNOID)// not two-handed
 						&& (youagr || (otmp != MON_WEP(magr) && otmp != MON_SWEP(magr)))	// not wielded already (monster)
+						&& (!youagr || otmp->owt <= max(10, P_SKILL(P_TWO_WEAPON_COMBAT)*10))// not too heavy
 						&& (!youagr || (otmp != uwep && (!u.twoweap || otmp != uswapwep)))	// not wielded already (player)
 						&& !(is_ammo(otmp) || is_pole(otmp) || is_missile(otmp))			// not unsuitable for melee (ammo, polearm, missile)
 						&& !otmp->owornmask)												// not worn
@@ -734,7 +720,7 @@ int tary;
 				boolean devaloop = (aatyp == AT_DEVA);
 				do {
 					bhitpos.x = tarx; bhitpos.y = tary;
-					result = xmeleehity(magr, mdef, attk, otmp, vis, tohitmod, ranged);
+					result = xmeleehity(magr, mdef, attk, &otmp, vis, tohitmod, ranged);
 					/* Marionette causes an additional weapon strike to a monster behind the original target */
 					/* this can attack peaceful/tame creatures without warning */
 					if (youagr && !ranged && u.sealsActive&SEAL_MARIONETTE && (result != MM_MISS))
@@ -752,7 +738,7 @@ int tary;
 							if (mdef2 && (mdef2 != mdef) && !DEADMONSTER(mdef2)) {
 								int vis2 = (VIS_MAGR | VIS_NONE) | (canseemon(mdef2) ? VIS_MDEF : 0);
 								bhitpos.x = tarx + dx; bhitpos.y = tary + dy;
-								(void)xmeleehity(magr, mdef2, attk, otmp, vis2, tohitmod, TRUE);
+								(void)xmeleehity(magr, mdef2, attk, &otmp, vis2, tohitmod, TRUE);
 								/* we aren't handling MM_AGR_DIED or MM_AGR_STOP; hopefully the attacker being a player covers those cases well enough */
 							}
 						}
@@ -786,7 +772,7 @@ int tary;
 							){
 								int vis2 = (VIS_MAGR | VIS_NONE) | (canseemon(mdef2) ? VIS_MDEF : 0);
 								bhitpos.x = x(magr) + nx; bhitpos.y = y(magr) + ny;
-								subresult = xmeleehity(magr, mdef2, attk, otmp, vis2, tohitmod, TRUE);
+								subresult = xmeleehity(magr, mdef2, attk, &otmp, vis2, tohitmod, TRUE);
 								/* handle MM_AGR_DIED and MM_AGR_STOP by adding them to the overall result, ignore other outcomes */
 								result |= subresult&(MM_AGR_DIED|MM_AGR_STOP);
 							}
@@ -814,7 +800,7 @@ int tary;
 								if(mdef2 == &youmonst || canseemon(mdef2))
 									vis2 |= VIS_MDEF;
 								bhitpos.x = tarx + dx; bhitpos.y = tary + dy;
-								subresult = xmeleehity(magr, mdef2, attk, otmp, vis2, tohitmod, TRUE);
+								subresult = xmeleehity(magr, mdef2, attk, &otmp, vis2, tohitmod, TRUE);
 								/* handle MM_AGR_DIED and MM_AGR_STOP by adding them to the overall result, ignore other outcomes */
 								result |= subresult&(MM_AGR_DIED|MM_AGR_STOP);
 							}
@@ -832,7 +818,7 @@ int tary;
 									if(mdef2 == &youmonst || canseemon(mdef2))
 										vis2 |= VIS_MDEF;
 									bhitpos.x = x(magr) + nx; bhitpos.y = y(magr) + ny;
-									subresult = xmeleehity(magr, mdef2, attk, otmp, vis2, tohitmod, TRUE);
+									subresult = xmeleehity(magr, mdef2, attk, &otmp, vis2, tohitmod, TRUE);
 									/* handle MM_AGR_DIED and MM_AGR_STOP by adding them to the overall result, ignore other outcomes */
 									result |= subresult&(MM_AGR_DIED|MM_AGR_STOP);
 								}
@@ -849,7 +835,7 @@ int tary;
 									if(mdef2 == &youmonst || canseemon(mdef2))
 										vis2 |= VIS_MDEF;
 									bhitpos.x = x(magr) + nx; bhitpos.y = y(magr) + ny;
-									subresult = xmeleehity(magr, mdef2, attk, otmp, vis2, tohitmod, TRUE);
+									subresult = xmeleehity(magr, mdef2, attk, &otmp, vis2, tohitmod, TRUE);
 									/* handle MM_AGR_DIED and MM_AGR_STOP by adding them to the overall result, ignore other outcomes */
 									result |= subresult&(MM_AGR_DIED|MM_AGR_STOP);
 								}
@@ -881,7 +867,7 @@ int tary;
 								if(mdef2 == &youmonst || canseemon(mdef2))
 									vis2 |= VIS_MDEF;
 								bhitpos.x = tarx + dx; bhitpos.y = tary + dy;
-								subresult = xmeleehity(magr, mdef2, &blood, (struct obj *)0, vis2, tohitmod, TRUE);
+								subresult = xmeleehity(magr, mdef2, &blood, (struct obj **)0, vis2, tohitmod, TRUE);
 								/* handle MM_AGR_DIED and MM_AGR_STOP by adding them to the overall result, ignore other outcomes */
 								result |= subresult&(MM_AGR_DIED|MM_AGR_STOP);
 							}
@@ -970,7 +956,7 @@ int tary;
 			}
 			/* make the attack */
 			bhitpos.x = tarx; bhitpos.y = tary;
-			result = xmeleehity(magr, mdef, attk, (struct obj *)0, vis, tohitmod, ranged);
+			result = xmeleehity(magr, mdef, attk, (struct obj **)0, vis, tohitmod, ranged);
 			dopassive_local = TRUE;
 			/* if the attack hits, or if the creature is able to notice it was attacked (but the attack missed) it wakes up */
 			if (youdef || (!(result&MM_DEF_DIED) && (result || (!mdef->msleeping && mdef->mcanmove))))
@@ -1061,7 +1047,7 @@ int tary;
 				/* lowest effort ranged attack -- goes straight to melee damage */
 				if (ranged && (distmin(x(magr), y(magr), tarx, tary) <= BOLT_LIM)) {
 					mon_ranged_gazeonly = FALSE;
-					result = xmeleehurty(magr, mdef, attk, attk, (struct obj *)0, TRUE, -1, rn1(18, 2), vis, ranged);
+					result = xmeleehurty(magr, mdef, attk, attk, (struct obj **)0, TRUE, -1, rn1(18, 2), vis, ranged);
 				}
 				break;
 			case AT_SPIT:
@@ -1133,7 +1119,7 @@ int tary;
 			}
 			/* make the attack */
 			bhitpos.x = tarx; bhitpos.y = tary;
-			result = xmeleehity(magr, mdef, attk, (struct obj *)0, vis, tohitmod, ranged);
+			result = xmeleehity(magr, mdef, attk, (struct obj **)0, vis, tohitmod, ranged);
 			if (distmin(x(magr), y(magr), tarx, tary) == 1)
 				dopassive_local = TRUE;
 			/* if the attack hits, or if the creature is able to notice it was attacked (but the attack missed) it wakes up */
@@ -1801,48 +1787,32 @@ int * tohitmod;					/* some attacks are made with decreased accuracy */
 		(pa->mtyp == PM_KARY__THE_FIEND_OF_FIRE) ||
 		(pa->mtyp == PM_KRAKEN__THE_FIEND_OF_WATER) ||
 		(pa->mtyp == PM_TIAMAT__THE_FIEND_OF_WIND) ||
-		(pa->mtyp == PM_CHAOS))
-		){
-		// first index -- determine if using the alternate attack set (solo spellcasting)
+		(pa->mtyp == PM_CHAOS) ||
+		(pa->mtyp == PM_GAE_ELADRIN)
+		)){
+		// first index -- determine if only using their spellcasting
 		if (*indexnum == 0){
 			if (
 				(pa->mtyp == PM_LICH__THE_FIEND_OF_EARTH && rn2(4)) ||
 				(pa->mtyp == PM_KARY__THE_FIEND_OF_FIRE && rn2(100)<37) ||
 				(pa->mtyp == PM_KRAKEN__THE_FIEND_OF_WATER && rn2(100)<52) ||
 				(pa->mtyp == PM_TIAMAT__THE_FIEND_OF_WIND && !rn2(4)) ||
-				(pa->mtyp == PM_CHAOS && rn2(3))
+				(pa->mtyp == PM_CHAOS && rn2(3)) ||
+				(pa->mtyp == PM_GAE_ELADRIN && !magr->mcan && !magr->mspec_used && !rn2(3))
 				){
 				*subout |= SUBOUT_SPELLS;
-				attk->aatyp = AT_MAGC;
-				attk->adtyp = AD_SPEL;
-				attk->damn = 0;
-				attk->damd = 0;
 			}
 		}
-		else if (*subout&SUBOUT_SPELLS){
-			/* If spellcasting, stop after the first index */
-			return &noattack;
+		/* cast only spells if SUBOUT_SPELLS; cast no spells if !SUBOUT_SPELLS */
+		if (!is_null_attk(attk) && ((attk->aatyp == AT_MAGC) == !(*subout&SUBOUT_SPELLS))) {
+			/* just get the next attack */
+			*indexnum += 1;
+			*prev_and_buf = prev_attack;
+			fromlist = TRUE;
+			return getattk(magr, mdef, prev_res, indexnum, prev_and_buf, by_the_book, subout, tohitmod);
 		}
 	}
-	if(!by_the_book && pa->mtyp == PM_GAE_ELADRIN){
-		// first index -- determine if using the alternate attack set (solo spellcasting)
-		if (*indexnum == 0){
-			if (!magr->mcan
-				&& !magr->mspec_used
-				&& !rn2(3)
-			){
-				*subout |= SUBOUT_SPELLS;
-				attk->aatyp = AT_MAGC;
-				attk->adtyp = AD_CLRC;
-				attk->damn = 0;
-				attk->damd = 6;
-			}
-		}
-		else if (*subout&SUBOUT_SPELLS){
-			/* If spellcasting, stop after the first index */
-			return &noattack;
-		}
-	}
+	/* Nitocris uses clerical spells while wearing their Prayer-Warded Wrappings */
 	if(!by_the_book && pa->mtyp == PM_NITOCRIS){
 		if (attk->aatyp == AT_MAGC){
 			if (which_armor(magr, W_ARMC) && which_armor(magr, W_ARMC)->oartifact == ART_PRAYER_WARDED_WRAPPINGS_OF){
@@ -2075,7 +2045,9 @@ int * tohitmod;					/* some attacks are made with decreased accuracy */
 	/* creatures wearing the Grappler's Grasp and currently grappling something get a hug attack if they don't have one already */
 	if (is_null_attk(attk) && !by_the_book && !dmgtype(pa, AT_HUGS) && !(*subout&SUBOUT_GRAPPLE)) {
 		struct obj * otmp = (youagr ? uarmg : which_armor(magr, W_ARMG));
-		if (otmp && otmp->oartifact == ART_GRAPPLER_S_GRASP) {
+		/* magr must already have hold of mdef, however, which makes it much less useful mvm */
+		if (otmp && otmp->oartifact == ART_GRAPPLER_S_GRASP &&
+			((youagr || youdef) && !u.uswallow && u.ustuck && u.ustuck == (youagr ? mdef : magr))) {
 			*attk = grapple;
 			attk->damn = youagr ? ((P_SKILL(P_BARE_HANDED_COMBAT) + 1) / 2 + martial_bonus()) : 2;
 			*subout |= SUBOUT_GRAPPLE;
@@ -3133,6 +3105,7 @@ int flat_acc;
 			gloves = (youagr ? uarmg : which_armor(magr, W_ARMG));
 			if (gloves){
 				switch (gloves->otyp) {
+				case HARMONIUM_GAUNTLETS:
 				case ORIHALCYON_GAUNTLETS:    /* metal */
 				case GAUNTLETS_OF_POWER:    /* metal */
 				case GAUNTLETS:
@@ -3403,17 +3376,18 @@ int flat_acc;
  * Uses MM_ return values
  */
 int
-xmeleehity(magr, mdef, attk, weapon, vis, flat_acc, ranged)
+xmeleehity(magr, mdef, attk, weapon_p, vis, flat_acc, ranged)
 struct monst * magr;
 struct monst * mdef;
 struct attack * attk;
-struct obj * weapon;
+struct obj ** weapon_p;
 int vis;
 int flat_acc;
 boolean ranged;
 {
 	boolean youagr = (magr == &youmonst);
 	boolean youdef = (mdef == &youmonst);
+	struct obj * weapon = weapon_p ? *(weapon_p) : (struct obj *)0;
 	struct attack alt_attk = *attk;
 	struct permonst * pa = youagr ? youracedata : magr->data;
 	struct permonst * pd = youdef ? youracedata : mdef->data;
@@ -3654,7 +3628,7 @@ boolean ranged;
 	/* if we hit... */
 	if (hit) {
 		/* DEAL THE DAMAGE */
-		result = xmeleehurty(magr, mdef, attk, attk, weapon, TRUE, -1, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, attk, attk, weapon_p, TRUE, -1, dieroll, vis, ranged);
 
 		/* the player exercises dexterity when hitting */
 		if (youagr)
@@ -3690,12 +3664,12 @@ boolean ranged;
  * what damage was dealt and who survived.
  */
 int
-xmeleehurty(magr, mdef, attk, originalattk, weapon, dohitmsg, flatdmg, dieroll, vis, ranged)
+xmeleehurty(magr, mdef, attk, originalattk, weapon_p, dohitmsg, flatdmg, dieroll, vis, ranged)
 struct monst * magr;
 struct monst * mdef;
 struct attack * attk;
 struct attack * originalattk;
-struct obj * weapon;
+struct obj ** weapon_p;
 boolean dohitmsg;
 int flatdmg;
 int dieroll;
@@ -3711,7 +3685,7 @@ boolean ranged;
 			armuncancel = FALSE;	// if armor is responsible for cancelling attack specials
 	boolean youagr = (magr == &youmonst);
 	boolean youdef = (mdef == &youmonst);
-	boolean wepgone = FALSE;
+	struct obj * weapon = weapon_p ? *(weapon_p) : (struct obj *)0;
 	boolean spec = FALSE;			// general-purpose special flag
 	struct attack alt_attk = *attk;	// buffer space to modify attacks in 
 	struct permonst * pa = youagr ? youracedata : magr->data;
@@ -3867,13 +3841,13 @@ boolean ranged;
 			   as they print a "being roasted" message */
 			if (originalattk->aatyp == AT_HUGS && (originalattk->adtyp == AD_FIRE || originalattk->adtyp == AD_EFIR))
 				dohitmsg = FALSE;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, 0, dieroll, vis, ranged);
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, 0, dieroll, vis, ranged);
 			/* return early if cannot continue the attack */
 			if (result&(MM_DEF_DIED|MM_DEF_LSVD)) return result;
 			/* then, make the elemental attack */
 			alt_attk = *attk;
 			alt_attk.aatyp = AT_NONE;
-			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 		default:
 			break;
 		}
@@ -3890,13 +3864,13 @@ boolean ranged;
 		{
 			/* no grabs allowed, substitute basic claw attack */
 			alt_attk.aatyp = AT_CLAW;
-			return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+			return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		}
 		else if (!(u.ustuck && u.ustuck == (youagr ? mdef : magr)))
 		{
 			/* if we aren't already stuck, try to grab them */
 			alt_attk.adtyp = AD_WRAP;
-			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		}
 		/* else continue on with the grab attack */
 	}
@@ -3930,13 +3904,15 @@ boolean ranged;
 			dohitmsg = FALSE;
 		}
 		/* hit with [weapon] */
-		result = hmon_general(magr, mdef, attk, originalattk, weapon, (struct obj *)0, (weapon && ranged) ? HMON_THRUST : HMON_WHACK, 0, dmg, dohitmsg, dieroll, FALSE, vis, &wepgone);
+		result = hmon_general(magr, mdef, attk, originalattk, weapon_p, (struct obj *)0, (weapon && ranged) ? HMON_THRUST : HMON_WHACK, 0, dmg, dohitmsg, dieroll, FALSE, vis);
+		if (weapon_p) weapon = *weapon_p;
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD|MM_AGR_DIED))
 			return result;
 		if (weapon && multistriking(weapon) && weapon->ostriking) {
 			int i;
-			for (i = 0; (i < weapon->ostriking); i++) {
-				result = hmon_general(magr, mdef, attk, originalattk, weapon, (struct obj *)0, (weapon && ranged) ? HMON_THRUST : HMON_WHACK, 0, 0, FALSE, dieroll, TRUE, vis, &wepgone);
+			for (i = 0; weapon && (i < weapon->ostriking); i++) {
+				result = hmon_general(magr, mdef, attk, originalattk, weapon_p, (struct obj *)0, (weapon && ranged) ? HMON_THRUST : HMON_WHACK, 0, 0, FALSE, dieroll, TRUE, vis);
+				if (weapon_p) weapon = *weapon_p;
 				if (result&(MM_DEF_DIED|MM_DEF_LSVD|MM_AGR_DIED))
 					return result;
 			}
@@ -4407,7 +4383,7 @@ boolean ranged;
 	case AD_BLND:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4434,7 +4410,7 @@ boolean ranged;
 	case AD_STUN:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4458,7 +4434,7 @@ boolean ranged;
 	case AD_CONF:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4489,7 +4465,7 @@ boolean ranged;
 	case AD_HALU:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4522,7 +4498,7 @@ boolean ranged;
 	case AD_SLOW:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4549,7 +4525,7 @@ boolean ranged;
 	case AD_SLEE:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4577,7 +4553,7 @@ boolean ranged;
 	case AD_PLYS:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4616,7 +4592,7 @@ boolean ranged;
 	case AD_STCK:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4646,7 +4622,7 @@ boolean ranged;
 	case AD_WERE:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4673,7 +4649,7 @@ boolean ranged;
 	case AD_POLY:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4701,7 +4677,7 @@ boolean ranged;
 	case AD_DREN:
 		/* we do NOT want to make a physical attack with these damage dice -- they tend to be quite large! */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, 0, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, 0, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4720,7 +4696,7 @@ boolean ranged;
 			xyhitmsg(magr, mdef, originalattk);
 		}
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -4800,7 +4776,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_DCAY:
 		/* print hitmessage */
@@ -4849,7 +4825,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_CORR:
 		/* print hitmessage */
@@ -4866,7 +4842,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_WET:
 	case AD_LETHE:
@@ -4882,7 +4858,7 @@ boolean ranged;
 		water_damage((youdef ? invent : mdef->minvent), FALSE, FALSE, (attk->adtyp == AD_LETHE ? TRUE : FALSE), mdef);
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_ENCH:
 		/* print hitmessage */
@@ -4907,7 +4883,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 		/* various poisons */
 	case AD_DRST:
@@ -4978,7 +4954,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_VAMP:
 	case AD_DRLI:
@@ -5015,10 +4991,10 @@ boolean ranged;
 			) {
 			if(attk->aatyp == AT_VINE && youdef && !HSterile){
 				You_feel("old.");
-				HSterile |= FROMOUTSIDE;
+				HSterile |= TIMEOUT_INF;
 				alt_attk.adtyp = AD_PHYS;
 				/* make attack without hitmsg */
-				return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+				return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 			}
 			/* blood bloaters split (but not the player) */
 			if (!youagr && pa->mtyp == PM_BLOOD_BLOATER){
@@ -5087,7 +5063,7 @@ boolean ranged;
 		}
 
 		/* make attack without hitmsg */
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 
 	case AD_DESC:
@@ -5117,7 +5093,7 @@ boolean ranged;
 		}
 		/* make attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_STON:
 		/* print a basic hit message */
@@ -5163,7 +5139,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_SLIM:
 		/* print a basic hit message */
@@ -5223,7 +5199,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_WISD:
 		/* print a basic hit message */
@@ -5247,7 +5223,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_NPDC:
 		/* print a basic hit message */
@@ -5271,7 +5247,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_CURS:
 		/* print a basic hit message */
@@ -5329,7 +5305,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_VORP:
 		/* do NOT immediately print a basic hit message -- vorpality can cause a miss */
@@ -5404,7 +5380,7 @@ boolean ranged;
 
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_SHRD:
 		/* get a piece of worn armor */
@@ -5494,7 +5470,7 @@ boolean ranged;
 			}
 			/* make a physical attack without hitmsg */
 			alt_attk.adtyp = AD_PHYS;
-			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 		}
 		/* no armor */
 		else {
@@ -5513,7 +5489,7 @@ boolean ranged;
 					dmg *= 2;
 					/* make a physical attack without hitmsg */
 					alt_attk.adtyp = AD_PHYS;
-					return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+					return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 				}
 				else {
 					/* custom hit message */
@@ -5533,7 +5509,7 @@ boolean ranged;
 		}
 		/* make physical attack WITH hitmsg, since none of the cases above applied */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 
 	case AD_MALK:
 		/* print a basic hit message */
@@ -5563,14 +5539,14 @@ boolean ranged;
 			int old_aatyp = alt_attk.aatyp;	/* save aatyp to put back after making ELEC attack */
 			alt_attk.aatyp = AT_NONE;
 			alt_attk.adtyp = AD_ELEC;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 			if (result&(MM_DEF_DIED | MM_DEF_LSVD | MM_AGR_DIED))
 				return result;
 			alt_attk.aatyp = old_aatyp;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 
 	case AD_TCKL:
@@ -5686,7 +5662,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_SUCK:
 		/* does nothing at all to noncorporeal or amoprhous creatures */
@@ -5913,7 +5889,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_UVUU:
 		/* print a basic hit message */
@@ -6015,7 +5991,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_TENT:
 		/* print a basic hit message */
@@ -6035,7 +6011,7 @@ boolean ranged;
 		 */
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_WEBS:
 		/* print a basic hit message */
@@ -6062,7 +6038,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_STDY:
 		/* study before doing the attack */
@@ -6091,7 +6067,7 @@ boolean ranged;
 		}
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 
 
 //////////////////////////////////////////////////////////////
@@ -6108,7 +6084,7 @@ boolean ranged;
 		boolean goatspawn = (pa->mtyp == PM_SMALL_GOAT_SPAWN || pa->mtyp == PM_GOAT_SPAWN || pa->mtyp == PM_GIANT_GOAT_SPAWN || pa->mtyp == PM_BLESSED);
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -6327,7 +6303,7 @@ boolean ranged;
 	case AD_SGLD:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -6416,7 +6392,7 @@ boolean ranged;
 			if (!rn2(20)) stealamulet(magr);
 		}
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_SQUE:
 		/* print a basic hit message */
@@ -6432,7 +6408,7 @@ boolean ranged;
 			if (!rn2(10)) stealquestart(magr);
 		}
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_STTP:
 		/* print a basic hit message */
@@ -6446,7 +6422,7 @@ boolean ranged;
 				teleport_arm(otmp);
 		}
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 //////////////////////////////////////////////////////////////
 // TELEPORTING ATTACKS
@@ -6459,7 +6435,7 @@ boolean ranged;
 	case AD_ABDC:
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -6528,7 +6504,7 @@ boolean ranged;
 	case AD_WEEP:	/* significantly different when targeting player */
 		/* make physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		/* return early if cannot continue the attack */
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD))
 			return result;
@@ -6626,7 +6602,7 @@ boolean ranged;
 			alt_attk.adtyp = AD_PHYS;
 
 			/* do this new attack */
-			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		}
 		else {
 			long side = rn2(2) ? RIGHT_SIDE : LEFT_SIDE;
@@ -6677,7 +6653,7 @@ boolean ranged;
 
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_DISN:
 		/* print a basic hit message */
@@ -6754,7 +6730,7 @@ boolean ranged;
 			if (rn2(20)) {
 				/* make physical attack */
 				alt_attk.adtyp = AD_PHYS;
-				return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+				return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 			}
 			else {
 				/* do the AD_DRIN attack, noting that we aren't eating brains */
@@ -6984,7 +6960,7 @@ boolean ranged;
 			(magr->mpeaceful != mdef->mpeaceful)) {
 			/* make physical attack */
 			alt_attk.adtyp = AD_PHYS;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		}
 		else {
 			/* don't print a basic hitmessage */
@@ -7058,7 +7034,7 @@ boolean ranged;
 			|| (sticks(mdef))){
 			/* make physical attack */
 			alt_attk.adtyp = AD_PHYS;
-			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		}
 		else {
 			/* figure out who the other creature is */
@@ -7205,7 +7181,7 @@ boolean ranged;
 		if (alt_attk.aatyp == AT_HUGS)
 			alt_attk.aatyp = AT_CLAW;
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_CHKH:
 		/* make modified physical attack */
@@ -7217,7 +7193,7 @@ boolean ranged;
 			dmg += u.chokhmah;
 		}
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 
 
 	case AD_CHRN:
@@ -7280,7 +7256,7 @@ boolean ranged;
 				break;
 			}
 		}
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_TELE:
 		/* hitter tries to teleport without making an attack */
@@ -7301,7 +7277,7 @@ boolean ranged;
 		}
 		/* if that failed, make a physical attack instead */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 
 	case AD_AXUS:
 		/* fancy hitmsg */
@@ -7314,20 +7290,20 @@ boolean ranged;
 		if (!Shock_res(mdef)) {
 			alt_attk.aatyp = AT_NONE;
 			alt_attk.adtyp = AD_ELEC;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);		/* elec damage */
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);		/* elec damage */
 			if (result&(MM_DEF_DIED | MM_DEF_LSVD)) return result;
 			alt_attk.adtyp = AD_FIRE;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);		/* fire damage */
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);		/* fire damage */
 			if (result&(MM_DEF_DIED | MM_DEF_LSVD)) return result;
 			alt_attk.adtyp = AD_STUN;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, 3, dieroll, vis, ranged);		/* 3 turn stun, minor physical damage */
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, 3, dieroll, vis, ranged);		/* 3 turn stun, minor physical damage */
 			if (result&(MM_DEF_DIED | MM_DEF_LSVD)) return result;
 		}
 		else {
 			/* 1-damage physical touch */
 			alt_attk.aatyp = AT_TUCH;
 			alt_attk.adtyp = AD_PHYS;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, 1, dieroll, vis, ranged);
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, 1, dieroll, vis, ranged);
 			if (result&(MM_DEF_DIED | MM_DEF_LSVD)) return result;
 		}
 
@@ -7341,17 +7317,17 @@ boolean ranged;
 		if (!Drain_res(mdef)) {
 			alt_attk.aatyp = AT_NONE;
 			alt_attk.adtyp = AD_COLD;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);		/* cold damage */
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);		/* cold damage */
 			if (result&(MM_DEF_DIED | MM_DEF_LSVD)) return result;
 			alt_attk.adtyp = AD_DRLI;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, 0, dieroll, vis, ranged);		/* level drain */
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, 0, dieroll, vis, ranged);		/* level drain */
 			if (result&(MM_DEF_DIED | MM_DEF_LSVD)) return result;
 		}
 		else {
 			/* 1-damage physical touch */
 			alt_attk.aatyp = AT_TUCH;
 			alt_attk.adtyp = AD_PHYS;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, 1, dieroll, vis, ranged);
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, 1, dieroll, vis, ranged);
 			if (result&(MM_DEF_DIED | MM_DEF_LSVD)) return result;
 		}
 
@@ -7360,13 +7336,13 @@ boolean ranged;
 	case AD_ACFR:
 		/* make a physical attack */
 		alt_attk.adtyp = AD_PHYS;
-		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		if (result&(MM_DEF_DIED|MM_DEF_LSVD)) return result;
 		alt_attk.aatyp = AT_NONE;
 		/* add fire damage, if not resistant */
 		if (!Fire_res(mdef)) {
 			alt_attk.adtyp = AD_FIRE;
-			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+			result = xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 			if (result&(MM_DEF_DIED|MM_DEF_LSVD)) return result;
 		}
 		/* add holy damage */
@@ -7410,7 +7386,7 @@ boolean ranged;
 		/* use correct damage type */
 		/* note: replaces originalattk */
 		alt_attk.adtyp = u.oonaenergy;
-		return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 
 	case AD_SESN:
 		/* use random damage type */
@@ -7433,7 +7409,7 @@ boolean ranged;
 				alt_attk.adtyp = AD_DRLI;
 			break;
 		}
-		return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 
 	case AD_HDRG:
 		/* use halfdragon's breath type */
@@ -7444,7 +7420,7 @@ boolean ranged;
 			alt_attk.adtyp = magr->mvar_hdBreath;
 		else
 			alt_attk.adtyp = AD_COLD;
-		return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 
 	case AD_RBRE:	/* should actually be breath-only */
 	case AD_RETR:
@@ -7456,7 +7432,7 @@ boolean ranged;
 		case 1: alt_attk.adtyp = AD_COLD; break;
 		case 2: alt_attk.adtyp = AD_ELEC; break;
 		}
-		return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, &alt_attk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 
 //////////////////////////////////////////////////////////////
 // BINDER SPIRIT ATTACKS
@@ -7495,7 +7471,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_NABERIUS:
 		/* print a basic hit message */
@@ -7530,7 +7506,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_OTIAX:
 		/* print a basic hit message */
@@ -7596,7 +7572,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_SIMURGH:
 		/* print a basic hit message */
@@ -7684,7 +7660,7 @@ boolean ranged;
 		}
 		/* make physical attack without hitmsg */
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 	
 //////////////////////////////////////////////////////////////
 // THE RIDERS' ATTACKS
@@ -7825,7 +7801,7 @@ boolean ranged;
 			}
 		}
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_PEST:
 		/* fancy hitmsg */
@@ -7858,7 +7834,7 @@ boolean ranged;
 			}
 		}
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_FAMN:
 		/* fancy hitmsg */
@@ -7916,7 +7892,7 @@ boolean ranged;
 			}
 		}
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 
 	case AD_CNFT:
 		{
@@ -7926,7 +7902,7 @@ boolean ranged;
 		{
 			/* avoid infinite loops; make a basic melee attack */
 			alt_attk.adtyp = AD_PHYS;
-			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, dohitmsg, dmg, dieroll, vis, ranged);
+			return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, dohitmsg, dmg, dieroll, vis, ranged);
 		}
 		else
 		{
@@ -7970,7 +7946,7 @@ boolean ranged;
 		}
 		}// close scope for in_conflict
 		alt_attk.adtyp = AD_PHYS;
-		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon, FALSE, dmg, dieroll, vis, ranged);
+		return xmeleehurty(magr, mdef, &alt_attk, originalattk, weapon_p, FALSE, dmg, dieroll, vis, ranged);
 		break;
 //////////////////////////////////////////////////////////////
 // NOT IMPLEMENTED FOR XMELEEHURTY
@@ -9678,7 +9654,7 @@ int vis;
 		alt_attk = *attk;
 		alt_attk.aatyp = AT_GAZE;
 		alt_attk.adtyp = adtyp;
-		result = xmeleehurty(magr, mdef, &alt_attk, attk, (struct obj *)0, FALSE, dmg, 0, vis, TRUE);
+		result = xmeleehurty(magr, mdef, &alt_attk, attk, (struct obj **)0, FALSE, dmg, 0, vis, TRUE);
 		wakeup2(mdef, youagr);
 		break;
 
@@ -9719,7 +9695,7 @@ int vis;
 			alt_attk = *attk;
 			alt_attk.aatyp = AT_NONE;
 			alt_attk.adtyp = AD_PHYS;
-			result = xmeleehurty(magr, mdef, &alt_attk, attk, (struct obj *)0, FALSE, dmg, 0, FALSE, TRUE);
+			result = xmeleehurty(magr, mdef, &alt_attk, attk, (struct obj **)0, FALSE, dmg, 0, FALSE, TRUE);
 			wakeup2(mdef, youagr);
 		}
 		break;
@@ -11043,18 +11019,17 @@ boolean * hittxt;
 
 /* hit mdef with some object that was launched in some way with no attacker of any sort */
 int
-hmon_with_unowned_obj(mdef, obj, dieroll, usedup)
+hmon_with_unowned_obj(mdef, obj_p, dieroll)
 struct monst * mdef;
-struct obj * obj;
+struct obj ** obj_p;
 int dieroll;
-boolean * usedup;
 {
 	return hmon_general(
 		(struct monst *)0,	/* no attacker */
 		mdef,				/* mdef is the defender */
 		(struct attack *)0,	/* no attack */
 		(struct attack *)0,	/* no attack */
-		obj,				/* hitting mdef with obj */
+		obj_p,				/* hitting mdef with obj */
 		(void *)0,			/* no launcher*/
 		HMON_FIRED,			/* obj should deal full thrown/fired damage */
 		0,					/* no damage override */
@@ -11062,18 +11037,16 @@ boolean * usedup;
 		TRUE,				/* yes, print hit message */
 		dieroll,			/* use given dieroll */
 		FALSE,				/* not recursed */
-		-1,					/* calculate visibility */
-		usedup);			/* maybe care whether or not obj gets used up */
+		-1);				/* calculate visibility */
 }
 /* hit mdef with a trap */
 int
-hmon_with_trap(mdef, obj, trap, type, dieroll, usedup)
+hmon_with_trap(mdef, obj_p, trap, type, dieroll)
 struct monst * mdef;
-struct obj * obj;
+struct obj ** obj_p;
 struct trap * trap;
 int type;
 int dieroll;
-boolean * usedup;
 {
 	/* melee traps print their own messages, while ranged traps rely on hmon to print hitmessages */
 	boolean printmsg;
@@ -11091,7 +11064,7 @@ boolean * usedup;
 		mdef,				/* mdef is the defender */
 		(struct attack *)0,	/* no attack */
 		(struct attack *)0,	/* no attack */
-		obj,				/* hitting mdef with obj */
+		obj_p,				/* hitting mdef with obj */
 		trap,				/* trap that did the hitting */
 		HMON_TRAP|type,		/* trap responsible, using given type */
 		0,					/* no damage override */
@@ -11099,8 +11072,7 @@ boolean * usedup;
 		printmsg,			/* maybe print hit message */
 		dieroll,			/* use given dieroll */
 		FALSE,				/* not recursed */
-		-1,					/* calculate visibility */
-		usedup);			/* maybe care whether or not obj gets used up */
+		-1);				/* calculate visibility */
 }
 
 /* hmon_general
@@ -11109,12 +11081,12 @@ boolean * usedup;
  * are called after the player hits, while letting hmoncore have messy returns wherever it wants
  */
 int
-hmon_general(magr, mdef, attk, originalattk, weapon, vpointer, hmoncode, flatbasedmg, monsdmg, dohitmsg, dieroll, recursed, vis, wepgone)
+hmon_general(magr, mdef, attk, originalattk, weapon_p, vpointer, hmoncode, flatbasedmg, monsdmg, dohitmsg, dieroll, recursed, vis)
 struct monst * magr;			/* attacker */
 struct monst * mdef;			/* defender */
 struct attack * attk;			/* attack structure to use -- if this does not exist, we MUST have a weapon */
 struct attack * originalattk;	/* original attack structure, used for messages */
-struct obj * weapon;			/* weapon to hit with */
+struct obj ** weapon_p;			/* pointer to weapon to hit with */
 void * vpointer;				/* additional /whatever/, type based on hmoncode. */
 int hmoncode;					/* what kind of pointer is vpointer, and what is it doing? (hack.h) */
 int flatbasedmg;				/* if >0, REPLACE basedmg with this value -- typically used for unusual weapon hits like throwing something upwards */
@@ -11123,13 +11095,9 @@ boolean dohitmsg;				/* print hit message? */
 int dieroll;					/* 1-20 accuracy dieroll, used for special effects */
 boolean recursed;				/* True for all but one attacks when 1 object is hitting >1 times in 1 attack. If so, avoid duplicating some messages and effects. */
 int vis;						/* True if action is at all visible to the player */
-boolean * wepgone;				/* used to return an additional result: was [weapon] destroyed? */
 {
 	int result;
 	boolean u_anger_guards;
-	boolean fakewepgone = FALSE;
-	if (!wepgone)
-		wepgone = &fakewepgone;
 
 	if (magr == &youmonst &&
 		mdef->mpeaceful &&
@@ -11141,10 +11109,7 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 	else
 		u_anger_guards = FALSE;
 
-	result = hmoncore(magr, mdef, attk, originalattk, weapon, vpointer, hmoncode, flatbasedmg, monsdmg, dohitmsg, dieroll, recursed, vis, wepgone);
-
-	if (fakewepgone)
-		panic("weapon gone that was not supposed to at all!");
+	result = hmoncore(magr, mdef, attk, originalattk, weapon_p, vpointer, hmoncode, flatbasedmg, monsdmg, dohitmsg, dieroll, recursed, vis);
 
 	/* reset killer */
 	killer = 0;
@@ -11158,12 +11123,12 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 }
 
 int
-hmoncore(magr, mdef, attk, originalattk, weapon, vpointer, hmoncode, flatbasedmg, monsdmg, dohitmsg, dieroll, recursed, vis, wepgone)
+hmoncore(magr, mdef, attk, originalattk, weapon_p, vpointer, hmoncode, flatbasedmg, monsdmg, dohitmsg, dieroll, recursed, vis)
 struct monst * magr;			/* attacker */
 struct monst * mdef;			/* defender */
 struct attack * attk;			/* attack structure to use */
 struct attack * originalattk;	/* original attack structure, used for messages */
-struct obj * weapon;			/* weapon to hit with */
+struct obj ** weapon_p;			/* pointer to weapon to hit with */
 void * vpointer;				/* additional /whatever/, type based on hmoncode. */
 int hmoncode;					/* what kind of pointer is vpointer, and what is it doing? (hack.h) */
 int flatbasedmg;				/* if >0, REPLACE basedmg with this value -- currently unused. SCOPECREEP: use hmon for things like throwing an object upwards */
@@ -11172,12 +11137,12 @@ boolean dohitmsg;				/* print hit message? */
 int dieroll;					/* 1-20 accuracy dieroll, used for special effects */
 boolean recursed;				/* True for all but one attacks when 1 object is hitting >1 times in 1 attack. If so, avoid duplicating some messages and effects. */
 int vis;						/* True if action is at all visible to the player */
-boolean * wepgone;				/* used to return an additional result: was [weapon] destroyed? */
 {
 	boolean youagr = (magr == &youmonst);
 	boolean youdef = (mdef == &youmonst);
 	struct permonst * pa = (magr ? (youagr ? youracedata : magr->data) : (struct permonst *)0);
 	struct permonst * pd = youdef ? youracedata : mdef->data;
+	struct obj * weapon = weapon_p ? *(weapon_p) : (struct obj *)0;
 
 	boolean staggering_strike = FALSE;
 	boolean shattering_strike = FALSE;
@@ -11910,6 +11875,8 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 			poisons |= OPOISON_FILTH;
 		if (poisonedobj->oartifact == ART_MOONBEAM)
 			poisons |= OPOISON_SLEEP;
+		if (poisonedobj->oartifact == ART_DIRGE)
+			poisons |= OPOISON_ACID;
 		/* Plague adds poisons to its launched ammo */
 		if (launcher && launcher->oartifact == ART_PLAGUE) {
 			if (monstermoves < launcher->ovar1)
@@ -12135,6 +12102,7 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 			else {
 				otmp = weapon;
 				weapon = (struct obj *)0;
+				*weapon_p = NULL;
 			}
 			if (otmp->where != OBJ_FREE) {
 				if (youagr)
@@ -12153,8 +12121,6 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 			/* do the potion effects */
 			/* note: if player is defending, this assumes the potion was thrown */
 			potionhit(mdef, otmp, youagr);
-			if (wepgone)
-				*wepgone = TRUE;
 			/* check if defender was killed */
 			if (*hp(mdef) < 1)
 				return (MM_HIT|MM_DEF_DIED);
@@ -12178,8 +12144,7 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 					weapon = &tempwep;
 					
 					nudzirath_shatter(otmp, bhitpos.x, bhitpos.y);
-					if (wepgone)
-						*wepgone = TRUE;
+					*weapon_p = NULL;
 
 					/* check if defender was killed */
 					if (*hp(mdef) < 1)
@@ -12310,7 +12275,7 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 				}
 
 				/* petrifying eggs */
-				if (touch_petrifies(&mons[weapon->corpsenm])) {
+				if (weapon->corpsenm != NON_PM && touch_petrifies(&mons[weapon->corpsenm])) {
 					/*learn_egg_type(obj->corpsenm);*/
 					if (vis) {
 						if (magr) {
@@ -12347,8 +12312,7 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 							useupall(weapon);
 						else for (; cnt; cnt--)
 							m_useup(magr, weapon);
-						if (wepgone)
-							*wepgone = TRUE;
+						*weapon_p = NULL;
 					}
 					/* return if we had a significant result from xstoney */
 					if (result&(MM_DEF_DIED | MM_DEF_LSVD | MM_AGR_DIED))
@@ -12387,8 +12351,7 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 						weapon->owt = weight(weapon);
 						if (thrown) {
 							place_object(weapon, x(mdef), y(mdef));
-							if (wepgone)
-								*wepgone = TRUE;
+							*weapon_p = NULL;
 						}
 					}
 					else {
@@ -13849,9 +13812,8 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 				impossible("used up weapon is not in monster's inventory or free (%d)", weapon->where);
 		}
 		if (deallocweapon) {
-			if (wepgone)
-				*wepgone = TRUE;
 			weapon = (struct obj *)0;
+			*weapon_p = NULL;
 		}
 	}
 	
@@ -13866,7 +13828,7 @@ boolean * wepgone;				/* used to return an additional result: was [weapon] destr
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	/* apply confuse monster (player only) */
-	if (youagr && u.umconf && !mdef->mconf) {
+	if (youagr && melee && u.umconf && !mdef->mconf) {
 		char *hands = makeplural(body_part(HAND));
 		/* message, reduce your hand glowiness */
 		if (u.umconf == 1) {
@@ -13980,7 +13942,7 @@ struct monst * mdef;
 		return xmeleehity(&youmonst,
 			mdef,
 			&shadowblade,
-			(struct obj *)0,
+			(struct obj **)0,
 			((canseemon(mdef) ? VIS_MDEF : 0) | VIS_MAGR | VIS_NONE),
 			tohitmod,
 			FALSE);
@@ -14192,7 +14154,7 @@ boolean endofchain;			/* if the attacker has finished their attack chain */
 					if(activeFightingForm(FFORM_SORESU))
 						use_skill(P_SORESU, 1);
 
-					newres = xmeleehity(mdef, magr, &basicattack, uwep, newvis, 0, FALSE);
+					newres = xmeleehity(mdef, magr, &basicattack, &uwep, newvis, 0, FALSE);
 					if (newres&MM_DEF_DIED)
 						result |= MM_AGR_DIED;	/* attacker died */
 					if (newres&MM_DEF_LSVD)
@@ -14278,7 +14240,7 @@ boolean endofchain;			/* if the attacker has finished their attack chain */
 						use_skill(P_SHIEN, 1);
 
 					/* make the attack */
-					newres = xmeleehity(mdef, magr, counter, otmp, newvis, 0, FALSE);
+					newres = xmeleehity(mdef, magr, counter, &otmp, newvis, 0, FALSE);
 					if (newres&MM_DEF_DIED)
 						result |= MM_AGR_DIED;	/* attacker died */
 					if (newres&MM_DEF_LSVD)
@@ -14306,7 +14268,7 @@ boolean endofchain;			/* if the attacker has finished their attack chain */
 
 					/* counterattack with two unarmed strikes, regardless of free-hand-ed-ness */
 					for (i = 0; i < 2; i++) {
-						newres = xmeleehity(mdef, magr, &basicattack, (struct obj *)0, newvis, 0, FALSE);
+						newres = xmeleehity(mdef, magr, &basicattack, (struct obj **)0, newvis, 0, FALSE);
 						if (newres&MM_DEF_DIED)
 							result |= MM_AGR_DIED;	/* attacker died */
 						if (newres&MM_DEF_LSVD)
@@ -14914,6 +14876,9 @@ boolean endofchain;			/* if the passive is occuring at the end of aggressor's at
 						}
 					}
 					break;
+				case AD_SSEX:
+					result = xmeleehurty(mdef, magr, passive, passive, (struct obj *)0, FALSE, dmg, 0, vis, FALSE);
+					break;
 				case AD_STUN:
 					if (youdef) {
 						if (!Stunned)
@@ -15214,9 +15179,9 @@ android_combo()
 			You("swing wildly!");
 		else {
 			vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-			xmeleehity(&youmonst, mdef, &weaponhit, (struct obj *)0, vis, 0, FALSE);
+			xmeleehity(&youmonst, mdef, &weaponhit, (struct obj **)0, vis, 0, FALSE);
 			if(!DEADMONSTER(mdef))
-				xmeleehity(&youmonst, mdef, &weaponhit, (struct obj *)0, vis, 0, FALSE);
+				xmeleehity(&youmonst, mdef, &weaponhit, (struct obj **)0, vis, 0, FALSE);
 		}
 		u.uen--;
 		flags.botl = 1;
@@ -15251,13 +15216,13 @@ android_combo()
 					You("swing wildly!");
 				else {
 					vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-					xmeleehity(&youmonst, mdef, &weaponhit,  (struct obj *)0, vis, 0, FALSE);
+					xmeleehity(&youmonst, mdef, &weaponhit, (struct obj **)0, vis, 0, FALSE);
 					if(!DEADMONSTER(mdef))
-						xmeleehity(&youmonst, mdef, &weaponhit,  (struct obj *)0, vis, 0, FALSE);
+						xmeleehity(&youmonst, mdef, &weaponhit, (struct obj **)0, vis, 0, FALSE);
 					if(!DEADMONSTER(mdef))
-						xmeleehity(&youmonst, mdef, &kickattack, (struct obj *)0, vis, 0, FALSE);
+						xmeleehity(&youmonst, mdef, &kickattack, (struct obj **)0, vis, 0, FALSE);
 					if(!DEADMONSTER(mdef))
-						xmeleehity(&youmonst, mdef, &kickattack, (struct obj *)0, vis, 0, FALSE);
+						xmeleehity(&youmonst, mdef, &kickattack, (struct obj **)0, vis, 0, FALSE);
 				}
 			}
 		}
@@ -15272,7 +15237,7 @@ android_combo()
 			if (!mdef || DEADMONSTER(mdef))
 				You("swing wildly!");
 			else {
-				xmeleehity(&youmonst, mdef, &finisher,   (struct obj *)0, vis, 0, FALSE);
+				xmeleehity(&youmonst, mdef, &finisher, (struct obj **)0, vis, 0, FALSE);
 			}
 		}
 		return TRUE;
@@ -15297,9 +15262,9 @@ android_combo()
 		}
 		else {
 			vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-			xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+			xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 			if(!DEADMONSTER(mdef))
-				xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+				xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 		}
 		u.uen--;
 		flags.botl = 1;
@@ -15321,7 +15286,7 @@ android_combo()
 				}
 				else {
 					vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-					xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+					xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 				}
 			}
 			k = dokick();
@@ -15350,9 +15315,9 @@ android_combo()
 				}
 				else {
 					vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-					xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+					xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 					if(!DEADMONSTER(mdef))
-						xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+						xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 				}
 			}
 		}
@@ -15386,9 +15351,9 @@ android_combo()
 				You("stab wildly!");
 			else {
 				vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-				xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+				xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 				if(!DEADMONSTER(mdef))
-					xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+					xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 			}
 			//lunge in the direction attacked. 
 			if(!u.ustuck && !u.utrap && goodpos(u.ux+u.dx, u.uy+u.dy, &youmonst, 0)){
@@ -15419,9 +15384,9 @@ android_combo()
 			You("swing wildly!");
 		else {
 			vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-			xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+			xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 			if(!DEADMONSTER(mdef))
-				xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+				xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 		}
 		u.uen--;
 		flags.botl = 1;
@@ -15440,7 +15405,7 @@ android_combo()
 				You("swing wildly!");
 			else {
 				vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-				xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+				xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 			}
 			u.uen--;
 			flags.botl = 1;
@@ -15464,9 +15429,9 @@ android_combo()
 					You("swing wildly!");
 				else {
 					vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-					xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+					xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 					if(!DEADMONSTER(mdef))
-						xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+						xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 				}
 			}
 			else {
@@ -15480,7 +15445,7 @@ android_combo()
 					You("swing wildly!");
 				else {
 					vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-					xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+					xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 				}
 			}
 			u.uen--;
@@ -15505,9 +15470,9 @@ android_combo()
 			You("swing wildly!");
 		else {
 			vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-			xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+			xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 			if(!DEADMONSTER(mdef))
-			xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+			xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 		}
 		u.uen--;
 		flags.botl = 1;
@@ -15548,7 +15513,7 @@ android_combo()
 						You("leap and swing wildly!");
 					else {
 						vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-						xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+						xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 					}
 					if(uwep)
 						projectile(&youmonst, uwep, (void *)0, HMON_FIRED, u.ux, u.uy, u.dx, u.dy, u.dz, 10, FALSE, TRUE, FALSE);
@@ -15586,7 +15551,7 @@ android_combo()
 			/* isn't that nice, we don't attack pets (even when confused?) */
 			if (mdef && !mdef->mtame){
 				vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-				xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+				xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 			}
 		}
 		u.uen--;
@@ -15609,7 +15574,7 @@ android_combo()
 				/* isn't that nice, we don't attack pets (even when confused?) */
 				if (mdef && !mdef->mtame){
 					vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-					xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+					xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 				}
 			}
 			u.uen--;
@@ -15628,7 +15593,7 @@ android_combo()
 				/* isn't that nice, we don't attack pets (even when confused?) */
 				if (mdef && !mdef->mtame){
 					vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
-					xmeleehity(&youmonst, mdef, &weaponhit, uwep, vis, 0, FALSE);
+					xmeleehity(&youmonst, mdef, &weaponhit, &uwep, vis, 0, FALSE);
 				}
 			}
 			if(uwep)
@@ -15653,5 +15618,5 @@ struct monst * mdef;
 {
 	int vis = (VIS_MAGR | VIS_NONE) | (canseemon(mdef) ? VIS_MDEF : 0);
 	notonhead = (bhitpos.x != x(mdef) || bhitpos.y != y(mdef));
-	return xmeleehity(&youmonst, mdef, &basicattack, uwep, vis, 0, TRUE);
+	return xmeleehity(&youmonst, mdef, &basicattack, &uwep, vis, 0, TRUE);
 }

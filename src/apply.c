@@ -3140,7 +3140,7 @@ struct obj *hypo;
 				if (!(HFast & INTRINSIC)) {
 					if (!Fast) You("speed up.");
 					else Your("quickness feels more natural.");
-					HFast |= FROMOUTSIDE;
+					HFast |= TIMEOUT_INF;
 				} else nothing++;
 				exercise(A_DEX, TRUE);
 			break;
@@ -3709,8 +3709,8 @@ struct obj *obj;
 				if(hitvalu > (dieroll = rnd(20))) {
 					boolean wepgone = FALSE;
 					pline_The("%s hits you as you try to snatch it!" the(onambuf));
-					hmon_general((struct monst *)0, &youmonst, (struct attack *)0, otmp, (void *)0, HMON_MISTHROWN,
-						0, 0, FALSE, dieroll, FALSE, -1, &wepgone);
+					hmon_general((struct monst *)0, &youmonst, (struct attack *)0, &otmp, (void *)0, HMON_MISTHROWN,
+						0, 0, FALSE, dieroll, FALSE, -1);
 				}
 				else {
 					if(Blind || !flags.verbose) pline("It misses.");
@@ -6229,7 +6229,8 @@ doapply()
 							   The(aobjnam(otmp, "slip")),
 							   (const char *)0);
 			break;
-			case SILVER_BULLET:{
+			case SILVER_BULLET:
+			if(otmp->quan >= 10){
 				struct obj *rocket;
 				rocket = mksobj(ROCKET, FALSE, FALSE);
 				rocket->blessed = otmp->blessed;

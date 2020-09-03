@@ -8,11 +8,6 @@
 
 #include "artifact.h"
 #include "xhity.h"
-#ifdef OVLB
-#include "artilist.h"
-#else
-STATIC_DCL struct artifact artilist[];
-#endif
 
 
 #ifndef NO_SIGNAL
@@ -1369,7 +1364,7 @@ karemade:
 				if(mtmp->mtyp == PM_CLOCKWORK_SOLDIER || mtmp->mtyp == PM_CLOCKWORK_DWARF || 
 				   mtmp->mtyp == PM_FABERGE_SPHERE || mtmp->mtyp == PM_FIREWORK_CART ||
 				   mtmp->mtyp == PM_ID_JUGGERNAUT
-				) if(rn2(2)) mtmp->mvar_vector = ((int)mtmp->mvar_vector + rn2(3)-1)%8;
+				) if(rn2(2)) mtmp->mvar_vector = ((int)mtmp->mvar_vector + rn2(3) + 7)%8;
 				if((mtmp->mtyp == PM_JUGGERNAUT || mtmp->mtyp == PM_ID_JUGGERNAUT) && !rn2(3)){
 					int mdx=0, mdy=0, i;
 					if(mtmp->mux == 0 && mtmp->muy == 0){
@@ -3402,7 +3397,7 @@ struct monst *magr;
 			else if(symbiote.aatyp == AT_GAZE)
 				xgazey(magr, mdef, &symbiote, -1);
 			else
-				xmeleehity(magr, mdef, &symbiote, (struct obj *)0, -1, 0, FALSE);
+				xmeleehity(magr, mdef, &symbiote, (struct obj **)0, -1, 0, FALSE);
 		}
 	}
 }

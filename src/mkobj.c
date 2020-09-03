@@ -1707,6 +1707,17 @@ struct obj* obj;
 	case SHEMAGH:
 	case STUDDED_LEATHER_ARMOR:
 	case BARNACLE_ARMOR:
+	case HEALER_UNIFORM:
+	case NOBLE_S_DRESS:
+	case CONSORT_S_SUIT:
+	case GENTLEMAN_S_SUIT:
+	case BLACK_DRESS:
+	case T_SHIRT:
+	case HAWAIIAN_SHIRT:
+	case STRIPED_SHIRT:
+	case ICHCAHUIPILLI:
+	case RUFFLED_SHIRT:
+	case VICTORIAN_UNDERWEAR:
 	case YA:
 	case ORIHALCYON_GAUNTLETS:
 	case HARMONIUM_HELM:
@@ -3237,10 +3248,9 @@ boolean tipping; /* caller emptying entire contents; affects shop handling */
         } else {
             /* assumes this is taking place at hero's location */
             if (!can_reach_floor()) {
-            	boolean wepgone = FALSE;
 				bhitpos.x = u.ux; bhitpos.y = u.uy;
 				obj->ox = u.ux; obj->oy = u.uy;
-				hitfloor2(&youmonst, obj, (struct obj *)0, FALSE, FALSE, &wepgone);
+				hitfloor2(&youmonst, &obj, (struct obj *)0, FALSE, FALSE);
                 //hitfloor(obj, TRUE); /* does altar check, message, drop */
             } else {
                 if (IS_ALTAR(levl[u.ux][u.uy].typ))
