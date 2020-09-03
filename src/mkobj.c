@@ -2521,6 +2521,7 @@ struct monst *mtmp;
 	EMON(obj)->nmon     = (struct monst *)0;
 	EMON(obj)->data     = (struct permonst *)0;
 	EMON(obj)->minvent  = (struct obj *)0;
+	EMON(obj)->light    = (struct ls_t *)0;
 	return obj;
 }
 
