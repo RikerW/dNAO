@@ -345,6 +345,8 @@ struct obj {
 	
 	struct mask_properties *mp;
 
+	struct ls_t * light;
+
 	union oextra * oextra_p;
 };
 
