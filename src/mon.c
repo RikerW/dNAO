@@ -87,7 +87,6 @@ STATIC_DCL void NDECL(warn_effects);
 STATIC_VAR int cham_to_pm[];
 #else
 STATIC_DCL struct obj *FDECL(make_corpse,(struct monst *));
-STATIC_DCL void FDECL(m_detach, (struct monst *, struct permonst *));
 STATIC_DCL void FDECL(lifesaved_monster, (struct monst *));
 
 STATIC_DCL double FDECL(atanGerald, (double x));
@@ -3849,7 +3848,7 @@ register struct monst *mon;
 }
 
 /* remove effects of mtmp from other data structures */
-STATIC_OVL void
+void
 m_detach(mtmp, mptr)
 struct monst *mtmp;
 struct permonst *mptr;	/* reflects mtmp->data _prior_ to mtmp's death */

@@ -2560,6 +2560,114 @@ struct obj **optr;
 	*optr = 0;
 }
 
+STATIC_OVL void
+use_pokeball(optr)
+struct obj **optr;
+{
+	register struct obj *obj = *optr;
+	xchar x, y;
+	coord cc;
+	int denom = 8;
+	int tmp;
+	struct monst* mtmp;
+	struct permonst *mptr; // for m_detach
+	
+	if (!obj){
+		flags.move = multi = 0;
+		return;
+	}
+	
+	if (obj->ovar1 > 0){
+		if (u.uswallow){
+			You("don't have the space to release anybody!");
+			return;
+		}
+		
+		if(!getdir((char *)0)) {
+			flags.move = multi = 0;
+			return;
+		}
+
+		x = u.ux + u.dx; y = u.uy + u.dy;
+		cc.x = x; cc.y = y;
+
+		if (!isok(x, y)){
+			You("can't release a Pokemon there!");
+			return;
+		}
+
+		if (MON_AT(x, y)){
+			pline("There's somebody in the way!");
+			return;
+		}
+		
+		u.pkmn.mhp = obj->ovar1;
+		obj->ovar1 = 0;
+		
+		place_monster(&u.pkmn, x, y);
+		newsym(x, y);
+
+	}
+	else {
+		if(!getdir((char *)0)) {
+			flags.move = multi = 0;
+			return;
+		}
+
+		x = u.ux + u.dx; y = u.uy + u.dy;
+		cc.x = x; cc.y = y;
+
+		if (!isok(x, y)){
+			You("can't catch a Pokemon from there!");
+			return;
+		}
+
+		if (!MON_AT(x, y)){
+			pline("There's nobody there to catch!");
+			return;
+		}
+		
+		mtmp = m_u_at(x, y);
+		mptr = mtmp->data;
+		
+		if (mtmp == &youmonst){
+			You("can't catch yourself!");
+			return;
+		}
+		
+		switch (mtmp->mhpmax / mtmp->mhp){
+			case 16:
+				denom = 1;
+			break;
+			case 8:
+				denom = 2;
+			break;
+			case 4:
+				denom = 4;
+			break;
+			case 2:
+				denom = 8;
+			break;
+			case 1:
+			default:
+				denom = 16;
+			break;
+		}
+		denom = 1;
+		
+		if (mtmp->mstun) denom = min(1, denom-1);
+		if (mtmp->msleeping) denom = min(1, denom/2);
+		
+		if (rn2(denom))
+			pline("%s resists being caught!", Monnam(mtmp));
+		else {
+			obj->ovar1 = mtmp->mhp;
+			m_detach(mtmp, mptr);
+			u.pkmn = *mtmp;
+		}
+	}
+}
+
 static NEARDATA const char lubricables[] = { ALL_CLASSES, ALLOW_NONE, 0 };
 static NEARDATA const char need_to_remove_outer_armor[] =
 			"need to remove your %s to grease your %s.";
@@ -6420,6 +6528,9 @@ doapply()
 
 	case FIGURINE:
 		use_figurine(&obj);
+	break;
+	case POKEBALL:
+		use_pokeball(&obj);
 	break;
 	case EFFIGY:{
 	    struct obj *curo;

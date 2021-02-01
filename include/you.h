@@ -442,6 +442,7 @@ struct you {
 	char ring_wishes;			/* Record the how many wishes were/should be in the castle ring */
 	unsigned udg_cnt;		/* timer for wizard intervention WRONG?:how long you have been demigod */
 	unsigned ill_cnt;		/* timer for illurien intervention */
+	struct monst	pkmn;
 	struct u_event	uevent;		/* certain events have happened */
 	struct u_have	uhave;		/* you're carrying special objects */
 	struct u_conduct uconduct;	/* KMH, conduct */
