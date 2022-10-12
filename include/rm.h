@@ -73,6 +73,8 @@ enum {
     CLOUD,
     FOG,
     DUST_CLOUD,
+	EMBERS,
+	VAPORS,
     PUDDLE,
     HELLISH_SEAL,
     MAX_TYPE
@@ -178,6 +180,8 @@ enum {
     S_cloud,
     S_fog,
     S_dust,
+	S_embers,
+    S_vapors,
     S_puddle,
     S_water,
 

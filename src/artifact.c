@@ -8544,13 +8544,20 @@ arti_invoke(obj)
 					break;
 					case COMMAND_VAPORS:
 						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_VAPORS;
-						pline("Woah, some trippy vapors are coming from that thing.");
+						pline("Woah, some trippy fog is coming from that thing.");
 					break;
 					case COMMAND_AETHER:
 						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_AETHER;
 						if (u.ualign.type == A_CHAOTIC) pline("Tenebrous aether drifts from the censer.");
 						else pline("Luminous aether drifts from the censer.");
 					break;
+#undef SMOKE_NONE
+#undef SMOKE_INCNSE
+#undef SMOKE_NFUMES
+#undef SMOKE_EMBERS
+#undef SMOKE_CLOUDS
+#undef SMOKE_VAPORS
+#undef SMOKE_AETHER
 					/*These effects are limited by timeout*/
 					case COMMAND_LADDER:
 						if(u.uswallow){
@@ -12052,6 +12059,36 @@ living_items()
 				}
 			}
 		}
+#define SMOKE_NONE		0
+#define SMOKE_INCNSE	1
+#define SMOKE_NFUMES	2
+#define SMOKE_EMBERS	3
+#define SMOKE_CLOUDS	4
+#define SMOKE_VAPORS	5
+#define SMOKE_AETHER	6
+		if (obj->oartifact == ART_CENSER_OF_HOLINESS && artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke != SMOKE_NONE && (obj->spe < rnd(70))){
+			xchar x, y;
+			if (get_obj_location(obj, &x, &y, 0)){
+				switch (artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke){
+					case SMOKE_NFUMES:
+						if(isok(obj->ox, obj->oy)) create_gas_cloud(x, y, rnd(3), rnd(3)+1, FALSE);
+					break;
+					case SMOKE_EMBERS:
+						if(isok(obj->ox, obj->oy)) create_ember_cloud(x, y, rnd(3), rnd(3)+1, FALSE);
+					break;
+					case SMOKE_VAPORS:
+						if(isok(obj->ox, obj->oy)) create_vapor_cloud(x, y, rnd(3), rnd(3)+1, FALSE);
+					break;
+				}
+			}
+		}
+#undef SMOKE_NONE
+#undef SMOKE_INCNSE
+#undef SMOKE_NFUMES
+#undef SMOKE_EMBERS
+#undef SMOKE_CLOUDS
+#undef SMOKE_VAPORS
+#undef SMOKE_AETHER
 		/* grease self-greasing objects */
 		if (check_oprop(obj, OPROP_GRES) && !obj->greased && !rn2(40)){
 			obj->greased = TRUE;

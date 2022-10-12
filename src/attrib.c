@@ -1348,7 +1348,7 @@ boolean check;
 	}
 	
 	if(check && delta < 0 && ((-delta > rn2(ACURR(A_WIS))) || -delta >= starting_sanity/10) && rn2(100) >= nightmare_starting_sanity 
-		&& !Panicking && !StumbleBlind && !StaggerShock && !Babble && !Screaming && !FaintingFits
+		&& !Panicking && !StumbleBlind && !StaggerShock && !Babble && !Screaming && !FaintingFits && !In_vapor_cloud(&youmonst)
 	){
 		switch(rn2(5)){
 			case 0:

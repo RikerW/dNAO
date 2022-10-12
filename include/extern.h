@@ -2455,6 +2455,8 @@ E void FDECL(split_rects, (NhRect *,NhRect *));
 E void NDECL(clear_regions);
 E void NDECL(run_regions);
 E boolean FDECL(In_fog_cloud, (struct monst *));
+E boolean FDECL(In_ember_cloud, (struct monst *));
+E boolean FDECL(In_vapor_cloud, (struct monst *));
 E boolean FDECL(check_solid_fog_region, (XCHAR_P,XCHAR_P));
 E boolean FDECL(check_stinking_cloud_region, (XCHAR_P,XCHAR_P));
 E boolean FDECL(check_dust_cloud_region, (XCHAR_P,XCHAR_P));
@@ -2469,6 +2471,9 @@ E void FDECL(rest_regions, (int,BOOLEAN_P));
 E NhRegion* FDECL(create_gas_cloud, (XCHAR_P, XCHAR_P, int, int, boolean));
 E NhRegion* FDECL(create_fog_cloud, (XCHAR_P, XCHAR_P, int, int, boolean));
 E NhRegion* FDECL(create_dust_cloud, (XCHAR_P, XCHAR_P, int, int));
+E NhRegion* FDECL(create_ember_cloud, (XCHAR_P, XCHAR_P, int, int, boolean));
+E NhRegion* FDECL(create_vapor_cloud, (XCHAR_P, XCHAR_P, int, int, boolean));
+
 
 /* ### restore.c ### */
 
