@@ -2025,7 +2025,7 @@ weapon:
 				Sprintf(eos(buf), " (%d:%d)", (int)obj->recharged, (int)obj->ovar1);
 			}
 			if (obj->known && obj->oartifact &&
-				(oart->inv_prop == LORDLY || oart->inv_prop == ANNUL)
+				((oart->inv_prop == LORDLY  && obj->oartifact != ART_CENSER_OF_HOLINESS) || oart->inv_prop == ANNUL)
 				){
 				Sprintf(eos(buf), " (%s)", OBJ_NAME(objects[obj->otyp]));
 			}

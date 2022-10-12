@@ -506,6 +506,10 @@
 				 (Swimming && u.divetimer > 0 && u.usubwater) || \
 				 amphibious(youracedata))
 
+#define HSmoke_immunity	u.uprops[SMOKE_IMMUNE].intrinsic
+#define ESmoke_immunity u.uprops[SMOKE_IMMUNE].extrinsic
+#define Smoke_immunity 	(HSmoke_immunity || ESmoke_immunity)
+
 #define HNightmare	u.uprops[WALKING_NIGHTMARE].intrinsic
 #define ENightmare	u.uprops[WALKING_NIGHTMARE].extrinsic
 #define Nightmare		(HNightmare || ENightmare)

@@ -2493,6 +2493,16 @@ A("The Mitre of Holiness",			HELM_OF_BRILLIANCE,	(const char *)0,
 	ENERGY_BOOST, (ARTI_PLUSSEV)
 	),
 
+A("The Censer of Holiness",			FLAIL,	(const char *)0,
+	2000L, MT_DEFAULT, MZ_DEFAULT, WT_DEFAULT,
+	A_LAWFUL, PM_PRIEST, NON_PM, TIER_A, (ARTG_NOGEN|ARTG_NOWISH|ARTG_MAJOR),
+	MONS(vsMA(MA_UNDEAD)),
+	ATTK(AD_PHYS, 5, 12), NOFLAG,
+	PROPS(ENERGY_REGENERATION), NOFLAG,
+	PROPS(WARN_OF_MON, DRAIN_RES, SMOKE_IMMUNE), NOFLAG,
+	LORDLY, NOFLAG
+	),
+
 /* protects inventory from curses */
 /* polymorphs contained items occasionally */
 A("The Treasury of Proteus",		CHEST,				(const char *)0,

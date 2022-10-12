@@ -3766,6 +3766,8 @@ winid *datawin;
 			case SLOW_DIGESTION:
 			case HALF_SPDAM:
 			case HALF_PHDAM:
+			case MAGICAL_BREATHING:
+			case SMOKE_IMMUNE:
 			case REGENERATION:
 			case ENERGY_REGENERATION:
 			case PROTECTION:

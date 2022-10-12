@@ -243,6 +243,14 @@
 #define COMMAND_GREEN           56
 #define COMMAND_YELLOW          57
 
+#define COMMAND_SNUFF			58
+#define COMMAND_INCENSE			59
+#define COMMAND_FUMES			60
+#define COMMAND_EMBERS			61
+#define COMMAND_CLOUDS			62
+#define COMMAND_VAPORS			64
+#define COMMAND_AETHER			65
+
 struct artifact {
 	/* Description */
 	int otyp;			/* base artifact type */
@@ -301,11 +309,13 @@ struct artinstance{
 #define PlagueDuration avar1
 #define IMAlitness avar1
 #define LeagueMod avar1
+#define CenserSmoke avar1
 	long avar2;
 #define SnSd2 avar2
 #define RoSPflights avar2
 #define RRSlunar avar2
 #define PlagueDoOnHit avar2
+#define CenserAether avar2
 	long avar3;
 #define SnSd3 avar3
 	long avar4;

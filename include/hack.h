@@ -394,6 +394,8 @@ NEARDATA extern coord bhitpos;	/* place where throw or zap hits or stops */
 
 #define ugod_is_angry() (u.ualign.record < 0)
 #define on_altar()	(IS_ALTAR(levl[u.ux][u.uy].typ) || goat_mouth_at(u.ux, u.uy) || bokrug_idol_at(u.ux, u.uy))
+#define on_altar_prayer()	(on_altar() || (uwep && uwep->oartifact == ART_CENSER_OF_HOLINESS && godlist[u.ualign.god].anger < 1 && u.ualign.record > 0))
+// on_altar but for prayer, used for censer since it counts as an altar for prayer purposes
 #define on_shrine()	(IS_ALTAR(levl[u.ux][u.uy].typ) && altars[levl[u.ux][u.uy].altar_num].shrine)
 
 /*  */

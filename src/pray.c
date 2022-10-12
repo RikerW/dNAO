@@ -213,10 +213,10 @@ in_trouble()
 	if(u.uhs >= WEAK && !Race_if(PM_INCANTIFIER)) return(TROUBLE_STARVING);
 	if (Upolyd ? (u.mh <= 5 || u.mh*2 <= u.mhmax) :
 		(u.uhp <= 5 || u.uhp*2 <= u.uhpmax)) return TROUBLE_HIT;
-	if(u.wimage >= 10 && on_altar()) return(TROUBLE_WIMAGE);
-	if(u.umorgul && on_altar()) return(TROUBLE_MORGUL);
-	if(u.umummyrot && on_altar()) return(TROUBLE_MROT);
-	if(u.uhpmod < -18 && on_altar()) return(TROUBLE_HPMOD);
+	if(u.wimage >= 10 && on_altar_prayer()) return(TROUBLE_WIMAGE);
+	if(u.umorgul && on_altar_prayer()) return(TROUBLE_MORGUL);
+	if(u.umummyrot && on_altar_prayer()) return(TROUBLE_MROT);
+	if(u.uhpmod < -18 && on_altar_prayer()) return(TROUBLE_HPMOD);
 	if(u.ulycn >= LOW_PM) return(TROUBLE_LYCANTHROPE);
 	if(near_capacity() >= EXT_ENCUMBER && AMAX(A_STR)-ABASE(A_STR) > 3)
 		return(TROUBLE_COLLAPSING);
@@ -895,13 +895,13 @@ int godnum;
 	    /* if hero was in trouble, but got better, no special favor */
 	    if (p_trouble == 0) pat_on_head = 1;
 	} else {
-	    int action = rn1(Luck + (on_altar() ? 3 + on_shrine() : 2), 1);
+	    int action = rn1(Luck + (on_altar_prayer() ? 3 + on_shrine() : 2), 1);
 	    /* pleased Lawful gods often send you a helpful angel if you're
 	       getting the crap beat out of you */
 	    if ((u.uhp < 5 || (u.uhp*7 < u.uhpmax)) &&
 		 u.ualign.type == A_LAWFUL && rn2(3)) lawful_god_gives_angel();
 
-	    if (!on_altar()) action = min(action, 3);
+	    if (!on_altar_prayer()) action = min(action, 3);
 	    if (u.ualign.record < STRIDENT)
 		action = (u.ualign.record > 0 || !rnl(2)) ? 1 : 0;
 
@@ -921,13 +921,78 @@ int godnum;
 	    }
 	}
 
+	struct monst *mdef;
+	struct monst *goodmon = (struct monst *)0;
+	if (uwep && uwep->oartifact == ART_CENSER_OF_HOLINESS){//(Luck > 10 && u.ualign.record >= PIOUS && u.uevent.qcompleted && uwep && uwep->oartifact == ART_CENSER_OF_HOLINESS){	
+		extern const int clockwisex[8];
+		extern const int clockwisey[8];
+		int i = rnd(8),j;
+		for(j=8;j>=1;j--){
+			if(u.ustuck && u.uswallow)
+				mdef = u.ustuck;
+			else if(!isok(u.ux+clockwisex[(i+j)%8], u.uy+clockwisey[(i+j)%8]))
+				continue;
+			else mdef = m_u_at(u.ux+clockwisex[(i+j)%8], u.uy+clockwisey[(i+j)%8]);
+
+			if(!mdef)
+				continue;
+
+			if(DEADMONSTER(mdef))
+				continue;
+
+			if (mdef->mtyp == PM_APOCALYPSE_ANGEL || mdef->mtyp == PM_DREAD_SERAPH || mdef->mtyp == PM_HARROWER_OF_ZARIEL){
+				goodmon = mdef;
+			} else if(fallenAngel(mdef) && !is_untamable(mdef->data) && !mdef->notame){
+				goodmon = mdef;
+			} else {
+				mdef = (struct monst *) 0;
+			}
+			if (goodmon) break;
+		}
+	}
     /* note: can't get pat_on_head unless all troubles have just been
        fixed or there were no troubles to begin with; hallucination
        won't be in effect so special handling for it is superfluous */
-    if(pat_on_head){
+    if(TRUE){
 		//Note: Luck > 10 means that you have a luckitem in open inventory.  To avoid crowning, just drop the luckitem.
 	    if (Luck > 10 && u.ualign.record >= PIOUS && !u.uevent.uhand_of_elbereth && u.uevent.qcompleted){
 			gcrownu();
+		}
+		else if (uwep && uwep->oartifact == ART_CENSER_OF_HOLINESS && goodmon){//(Luck > 10 && u.ualign.record >= PIOUS && u.uevent.qcompleted && uwep && uwep->oartifact == ART_CENSER_OF_HOLINESS){
+			struct monst * newmon;
+			pline("The presence of %s weighs heavily upon you... Emboldened by the power of the Censer of Holiness, and with the backing of %s, you attempt to purify this lost soul!", \
+				mon_nam(goodmon), godname(p_god));
+			shieldeff(goodmon->mx, goodmon->my);
+			switch (goodmon->mtyp){
+				case PM_APOCALYPSE_ANGEL:
+					pline("\"I serve the will of the gods in ways you cannot even begin to fathom, mortal!\"");
+					You("%s...", stagger(&youmonst, "stagger"));
+					change_usanity(-1*d(7,7), TRUE);
+					if (rn2(3)) make_stunned((HStun)+d(7, 7), FALSE);
+					if (rn2(3)) make_confused((HConfusion)+d(7, 7), FALSE);
+					if (!rn2(3)) make_hallucinated((HHallucination)+d(7, 7), FALSE, 0L);
+					if (!rn2(3)) make_blinded((Blinded)+d(7, 7), FALSE);
+				break;
+				case PM_DREAD_SERAPH:
+					
+				break;
+				case PM_HARROWER_OF_ZARIEL:
+					
+				break;
+				default:
+					if ((newmon = tamedog_core(goodmon, (struct obj *)0, TRUE))){
+						set_template(newmon, 0);
+						pline("Your ritual is successful, and the %s's soul is cleansed!", mon_nam(goodmon));
+						pline("Grateful for your aid, the %s resolves to entrust %s to your guidance.", mon_nam(goodmon), mon_nam_too(goodmon, goodmon));
+						if (artinstance[ART_CENSER_OF_HOLINESS].CenserAether < 1){
+							pline("The Censer of Holiness shakes in your grasp... you see wisps of aether drifting around it.");
+							artinstance[ART_CENSER_OF_HOLINESS].CenserAether = 1;
+						}
+					} else {
+						pline("You reel back, astonished! This angel is beyond saving!");
+					}
+				break;
+			}
 		}
 		else if(Pantheon_if(PM_VALKYRIE) && u.ualign.record >= PIOUS 
 			&& uwep && is_spear(uwep) && !uwep->oartifact && uwep->spe >= 5 
@@ -1160,23 +1225,23 @@ water_prayer(bless_water)
 		if (!Blind) {
 			if (strncmpi(The(xname(otmp)), "The ", 4))
 			{
-				pline("On the altar, %s glow%s %s for a moment.",
+				pline("%s%s glow%s %s for a moment.", (on_altar() ? "On the altar, " : "Below you, "),
 					xname(otmp), (otmp->quan > 1L ? "" : "s"),
 					(bless_water ? hcolor(NH_LIGHT_BLUE) : hcolor(NH_BLACK)));
 			}
 			else
 			{
-				pline("%s on the altar glow%s %s for a moment.",
-					The(xname(otmp)), (otmp->quan > 1L ? "" : "s"),
+				pline("%s %sglow%s %s for a moment.",
+					The(xname(otmp)), (on_altar() ? "on the altar " : "below you "), (otmp->quan > 1L ? "" : "s"),
 					(bless_water ? hcolor(NH_LIGHT_BLUE) : hcolor(NH_BLACK)));
 			}
 		}
 	}
     }
     if(!Blind && changed) {
-	pline("%s potion%s on the altar glow%s %s for a moment.",
+	pline("%s potion %s%sglow%s %s for a moment.",
 	      ((other && changed > 1L) ? "Some of the" :
-					(other ? "One of the" : "The")),
+					(other ? "One of the" : "The")), (on_altar() ? "on the altar " : "below you "),
 	      ((other || changed > 1L) ? "s" : ""), (changed > 1L ? "" : "s"),
 	      (bless_water ? hcolor(NH_LIGHT_BLUE) : hcolor(NH_BLACK)));
     }
@@ -2418,7 +2483,7 @@ prayer_done()		/* M. Stephenson (1.0.3b) */
 			"at best sporadic");
 	}
 	exercise(A_CON, FALSE);
-	if(on_altar()){
+	if(on_altar_prayer()){
 		(void) water_prayer(FALSE);
 		change_luck(-3);
 		gods_upset(p_god);
@@ -2434,11 +2499,11 @@ prayer_done()		/* M. Stephenson (1.0.3b) */
     }
 
     if (p_type == 0) {
-        if(on_altar() && u.ualign.god != p_god)
+        if(on_altar_prayer() && u.ualign.god != p_god)
             (void) water_prayer(FALSE);
         angrygods(u.ualign.god);       /* naughty */
     } else if (p_type == 1) {
-		if(on_altar() && u.ualign.god != p_god)
+		if(on_altar_prayer() && u.ualign.god != p_god)
 			(void) water_prayer(FALSE);
 		if(u.ualign.type != A_VOID){
 			u.ublesscnt += rnz(250);
@@ -2454,7 +2519,7 @@ prayer_done()		/* M. Stephenson (1.0.3b) */
 		} else pleased(p_god);
     } else {
 	/* coaligned */
-	if(on_altar())
+	if(on_altar_prayer())
 	    (void) water_prayer(TRUE);
 	pleased(p_god); /* nice */
     }

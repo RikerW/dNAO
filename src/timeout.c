@@ -83,6 +83,7 @@ const struct propname {
     { WWALKING, "water walking" },
     { SWIMMING, "swimming" },
     { MAGICAL_BREATHING, "magical breathing" },
+    { SMOKE_IMMUNE, "immunity to smoke and smoke-like effects" },
     { PASSES_WALLS, "pass thru walls" },
     { SLOW_DIGESTION, "slow digestion" },
     { HALF_SPDAM, "half spell damage" },

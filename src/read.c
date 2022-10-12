@@ -3574,6 +3574,9 @@ int gen_restrict;
 			else if (!strncmpi(bufp, "fulvous ", l = 8)) {
 				undeadtype = YELLOW_TEMPLATE;
 			}
+			else if (!strncmpi(bufp, "fallen_angel ", l = 13)) {
+				undeadtype = FALLEN_TEMPLATE;
+			}
 			else if (!strncmpi(bufp, "mad_angel ", l = 10)) {
 				undeadtype = MAD_TEMPLATE;
 			}

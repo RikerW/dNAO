@@ -8499,6 +8499,7 @@ arti_invoke(obj)
 					case COMMAND_E_LANCE:
 						uwep->otyp = ELVEN_LANCE;
 					break;
+					/* Y'ha-Talla */
 					case COMMAND_SCIMITAR:
 						uwep->otyp = SCIMITAR;
 					break;
@@ -8507,10 +8508,48 @@ arti_invoke(obj)
 						if(uwep->oartifact == ART_XIUHCOATL && uwep->obj_material == WOOD)
 							set_material_gm(uwep, artilist[uwep->oartifact].material);
 					break;
+					/* Xiuhcoatl (whip too) */
 					case COMMAND_ATLATL:
 						uwep->otyp = ATLATL;
 						if(uwep->oartifact == ART_XIUHCOATL && uwep->obj_material == artilist[uwep->oartifact].material)
 							set_material_gm(uwep, WOOD);
+					break;
+					/* Censer of Holiness*/
+#define SMOKE_NONE		0
+#define SMOKE_INCNSE	1
+#define SMOKE_NFUMES	2
+#define SMOKE_EMBERS	3
+#define SMOKE_CLOUDS	4
+#define SMOKE_VAPORS	5
+#define SMOKE_AETHER	6
+					case COMMAND_SNUFF:
+						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_NONE;
+						pline("The censer is snuffed out.");
+					break;
+					case COMMAND_INCENSE:
+						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_INCNSE;
+						pline("Calming smoke drifts from the censer.");
+					break;
+					case COMMAND_FUMES:
+						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_NFUMES;
+						pline("Noxious fumes drift from the censer.");
+					break;
+					case COMMAND_EMBERS:
+						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_EMBERS;
+						pline("Burning embers drift from the censer.");
+					break;
+					case COMMAND_CLOUDS:
+						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_CLOUDS;
+						pline("Sparking clouds drifts from the censer.");
+					break;
+					case COMMAND_VAPORS:
+						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_VAPORS;
+						pline("Woah, some trippy vapors are coming from that thing.");
+					break;
+					case COMMAND_AETHER:
+						artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke = SMOKE_AETHER;
+						if (u.ualign.type == A_CHAOTIC) pline("Tenebrous aether drifts from the censer.");
+						else pline("Luminous aether drifts from the censer.");
 					break;
 					/*These effects are limited by timeout*/
 					case COMMAND_LADDER:
@@ -10296,6 +10335,72 @@ struct obj *obj;
 				'w', 0, ATR_NONE, buf,
 				MENU_UNSELECTED);
 		}
+	} else if(obj->oartifact == ART_CENSER_OF_HOLINESS){
+#define SMOKE_NONE		0
+#define SMOKE_INCNSE	1
+#define SMOKE_NFUMES	2
+#define SMOKE_EMBERS	3
+#define SMOKE_CLOUDS	4
+#define SMOKE_VAPORS	5
+#define SMOKE_AETHER	6
+		if(artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke != SMOKE_NONE){
+			Sprintf(buf, "Snuff censer");
+			any.a_int = COMMAND_SNUFF;	/* must be non-zero */
+			add_menu(tmpwin, NO_GLYPH, &any,
+				's', 0, ATR_NONE, buf,
+				MENU_UNSELECTED);
+		}
+		if(artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke != SMOKE_INCNSE){
+			Sprintf(buf, "Burn ritual incense");
+			any.a_int = COMMAND_INCENSE;	/* must be non-zero */
+			add_menu(tmpwin, NO_GLYPH, &any,
+				'r', 0, ATR_NONE, buf,
+				MENU_UNSELECTED);
+		}
+		if(artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke != SMOKE_NFUMES){
+			Sprintf(buf, "Burn foul incense");
+			any.a_int = COMMAND_FUMES;	/* must be non-zero */
+			add_menu(tmpwin, NO_GLYPH, &any,
+				'f', 0, ATR_NONE, buf,
+				MENU_UNSELECTED);
+		}
+		if(artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke != SMOKE_EMBERS){
+			Sprintf(buf, "Burn charred incense");
+			any.a_int = COMMAND_EMBERS;	/* must be non-zero */
+			add_menu(tmpwin, NO_GLYPH, &any,
+				'c', 0, ATR_NONE, buf,
+				MENU_UNSELECTED);
+		}
+		if(artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke != SMOKE_CLOUDS){
+			Sprintf(buf, "Burn metallic incense");
+			any.a_int = COMMAND_CLOUDS;	/* must be non-zero */
+			add_menu(tmpwin, NO_GLYPH, &any,
+				'm', 0, ATR_NONE, buf,
+				MENU_UNSELECTED);
+		}
+		if(artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke != SMOKE_VAPORS && Hallucination){
+			Sprintf(buf, "Burn psychedelic incense");
+			any.a_int = COMMAND_VAPORS;	/* must be non-zero */
+			add_menu(tmpwin, NO_GLYPH, &any,
+				'p', 0, ATR_NONE, buf,
+				MENU_UNSELECTED);
+		}
+		if(artinstance[ART_CENSER_OF_HOLINESS].CenserSmoke != SMOKE_AETHER && artinstance[ART_CENSER_OF_HOLINESS].CenserAether){
+			if (u.ualign.type == A_CHAOTIC) Sprintf(buf, "Burn unholy incense");
+			else Sprintf(buf, "Burn holy incense");
+			
+			any.a_int = COMMAND_AETHER;	/* must be non-zero */
+			add_menu(tmpwin, NO_GLYPH, &any,
+				(u.ualign.type == A_CHAOTIC) ? 'u' : 'h', 0, ATR_NONE, buf,
+				MENU_UNSELECTED);
+		}
+#undef SMOKE_NONE
+#undef SMOKE_INCNSE
+#undef SMOKE_NFUMES
+#undef SMOKE_EMBERS
+#undef SMOKE_CLOUDS
+#undef SMOKE_VAPORS
+#undef SMOKE_AETHER
 	} else {
 		if(obj->otyp != RAPIER){
 			Sprintf(buf, "Become a rapier");
@@ -10351,6 +10456,7 @@ struct obj *obj;
 			add_menu(tmpwin, NO_GLYPH, &any,
 				'c', 0, ATR_NONE, buf,
 				MENU_UNSELECTED);
+		} else if (obj->oartifact == ART_CENSER_OF_HOLINESS) {
 		} else {
 			if((obj->otyp == MACE || obj->otyp == ELVEN_MACE || obj->otyp == KHAKKHARA) && (
 			   u.uswallow || 
