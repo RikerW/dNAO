@@ -1326,7 +1326,8 @@ do_look(quick)
 		) {
 		    if (level.flags.lethe && !strcmp(x_str, "water")) //lethe
 				found += append_str(out_str, "sparkling water"); //lethe
-		    else if (strstr(x_str, "cloud") != NULL){ //cloudspam
+		    else if (strstr(x_str, "cloud") != NULL || strstr(x_str, "burning embers") != NULL || \
+					strstr(x_str, "festive fog") != NULL || strstr(x_str, "aether") != NULL){ //cloudspam
 				found += append_str(out_str, "cloud"); //cloudspam
 				hit_cloud = TRUE;
 			}

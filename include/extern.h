@@ -2473,7 +2473,7 @@ E NhRegion* FDECL(create_fog_cloud, (XCHAR_P, XCHAR_P, int, int, boolean));
 E NhRegion* FDECL(create_dust_cloud, (XCHAR_P, XCHAR_P, int, int));
 E NhRegion* FDECL(create_ember_cloud, (XCHAR_P, XCHAR_P, int, int, boolean));
 E NhRegion* FDECL(create_vapor_cloud, (XCHAR_P, XCHAR_P, int, int, boolean));
-
+E NhRegion* FDECL(create_aether_cloud, (XCHAR_P, XCHAR_P, int, int, boolean));
 
 /* ### restore.c ### */
 

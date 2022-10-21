@@ -281,6 +281,7 @@ const struct symdef defsyms[MAXPCHARS] = {
 /*40*/	{'#', "dust cloud",	C(CLR_WHITE)},	/* [part of] a cloud */
 /*40*/	{'#', "burning embers",	C(CLR_RED)},	/* [part of] a cloud */
 /*40*/	{'#', "festive fog",	C(CLR_MAGENTA)},	/* [part of] a cloud */
+/*40*/	{'#', "aether",	C(CLR_GRAY)},	/* [part of] a cloud */
 	{'~', "shallow water",	C(CLR_BLUE)},	/* shallow water */
 	{'}', "water",		C(CLR_BLUE)},	/* under water */
 	{'^', "arrow trap",	C(HI_METAL)},	/* trap */
@@ -411,6 +412,7 @@ static glyph_t ibm_graphics[MAXPCHARS] = {
 	g_FILLER(S_dust),
 	g_FILLER(S_embers),
 	g_FILLER(S_vapors),
+	g_FILLER(S_aether),
 	g_FILLER(S_puddle),
 	0xf7,	/* S_water:	meta-w, approx. equals */
 	g_FILLER(S_arrow_trap),
@@ -529,6 +531,7 @@ static glyph_t dec_graphics[MAXPCHARS] = {
 	g_FILLER(S_dust),
 	g_FILLER(S_embers),
 	g_FILLER(S_vapors),
+	g_FILLER(S_aether),
 	g_FILLER(S_puddle),
 	0xe0,	/* S_water:	meta-\, diamond */
 	g_FILLER(S_arrow_trap),
@@ -645,6 +648,7 @@ static glyph_t mac_graphics[MAXPCHARS] = {
 	g_FILLER(S_dust),
 	g_FILLER(S_embers),
 	g_FILLER(S_vapors),
+	g_FILLER(S_aether),
 	g_FILLER(S_puddle),
 	g_FILLER(S_water),
 	g_FILLER(S_arrow_trap),
@@ -763,6 +767,7 @@ static glyph_t utf8_graphics[MAXPCHARS] = {
 	g_FILLER(S_dust),
 	g_FILLER(S_embers),
 	g_FILLER(S_vapors),
+	g_FILLER(S_aether),
 	g_FILLER(S_puddle),
 	0x2248,	/* S_water:	ALMOST EQUAL TO */
 	g_FILLER(S_arrow_trap),

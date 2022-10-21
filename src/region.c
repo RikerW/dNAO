@@ -29,6 +29,9 @@ boolean FDECL(inside_ember_cloud, (genericptr,genericptr));
 boolean FDECL(expire_ember_cloud, (genericptr,genericptr));
 boolean FDECL(inside_vapor_cloud, (genericptr,genericptr));
 boolean FDECL(expire_vapor_cloud, (genericptr,genericptr));
+boolean FDECL(inside_aether_cloud, (genericptr,genericptr));
+boolean FDECL(expire_aether_cloud, (genericptr,genericptr));
+
 boolean FDECL(inside_rect, (NhRect *,int,int));
 boolean FDECL(inside_region, (NhRegion *,int,int));
 NhRegion *FDECL(create_region, (NhRect *,int));
@@ -75,7 +78,11 @@ static callback_proc callbacks[] = {
 #define INSIDE_VAPOR_CLOUD 8
     inside_vapor_cloud,
 #define EXPIRE_VAPOR_CLOUD 9
-    expire_vapor_cloud
+    expire_vapor_cloud,
+#define INSIDE_AETHER_CLOUD 10
+    inside_aether_cloud,
+#define EXPIRE_AETHER_CLOUD 11
+    expire_aether_cloud
 };
 
 /* Should be inlined. */
@@ -1618,6 +1625,119 @@ boolean yours;
 	else clear_heros_fault(cloud);
     cloud->inside_f = INSIDE_VAPOR_CLOUD;
     cloud->expire_f = EXPIRE_VAPOR_CLOUD;
+    cloud->arg = (genericptr_t)(intptr_t)damage;
+    cloud->visible = TRUE;
+    cloud->glyph = cmap_to_glyph(S_vapors);
+    add_region(cloud);
+    return cloud;
+}
+
+boolean
+expire_aether_cloud(p1, p2)
+genericptr_t p1;
+genericptr_t p2;
+{
+    NhRegion *reg;
+    int damage;
+
+    reg = (NhRegion *) p1;
+    damage = (int)(intptr_t)reg->arg;
+
+    /* If it was a thick cloud, it dissipates a little first */
+    if (damage >= 5) {
+	damage /= 2;		/* It dissipates, let's do less damage */
+	reg->arg = (genericptr_t)(intptr_t)damage;
+	reg->ttl = 2;		/* Here's the trick : reset ttl */
+	return FALSE;		/* THEN return FALSE, means "still there" */
+    }
+    return TRUE;		/* OK, it's gone, you can free it! */
+}
+
+boolean
+inside_aether_cloud(p1, p2)
+genericptr_t p1;
+genericptr_t p2;
+{
+    NhRegion *reg;
+    struct monst *mtmp;
+    int dam;
+
+    reg = (NhRegion *) p1;
+    dam = (int)(intptr_t)reg->arg;
+    if (p2 == NULL) {		/* This means *YOU* Bozo! */
+		if (Invulnerable || Smoke_immunity)
+			return FALSE;
+		if (!Hallucination){
+			make_hallucinated(HHallucination+5L, FALSE, 0L);
+			if (!Halluc_resistance) pline("Woah, this stuff is trippy!");
+		}
+		if (!Halluc_resistance) {
+			losehp(1, "festive fog", KILLED_BY);
+			You("inhale the purple vapors.");
+			return FALSE;
+		} else
+			return FALSE;
+    } else {			/* A monster is inside the cloud */
+		mtmp = (struct monst *) p2;
+
+		if(!mindless_mon(mtmp) && !mtmp->mtame && !is_render(mtmp->mtyp)){
+			if (heros_fault(reg) && !rn2(3)){
+				setmangry(mtmp);
+				you_inflict_madness(mtmp);
+			}
+			mtmp->mconf = 1;
+			if (!rn2(3)) {
+				mtmp->mstun = 1;
+				pline("%s staggers briefly.", Monnam(mtmp));
+			}
+			mtmp->mhp -= 1;
+
+			if (mtmp->mhp <= 0) {
+				if (heros_fault(reg))
+					killed(mtmp);
+				else
+					monkilled(mtmp, "festive fog", AD_FIRE);
+				if (mtmp->mhp <= 0) {	/* not lifesaved */
+					return TRUE;
+				}
+			}
+		}
+    }
+    return FALSE;		/* Monster is still alive */
+}
+
+NhRegion *
+create_aether_cloud(x, y, radius, damage, yours)
+xchar x, y;
+int radius;
+int damage;
+boolean yours;
+{
+    NhRegion *cloud;
+    int i, nrect;
+    NhRect tmprect;
+
+    cloud = create_region((NhRect *) 0, 0);
+    nrect = radius;
+    tmprect.lx = x;
+    tmprect.hx = x;
+    tmprect.ly = y - (radius - 1);
+    tmprect.hy = y + (radius - 1);
+    for (i = 0; i < nrect; i++) {
+	add_rect_to_reg(cloud, &tmprect);
+	tmprect.lx--;
+	tmprect.hx++;
+	tmprect.ly++;
+	tmprect.hy--;
+    }
+    cloud->ttl = damage;
+	cloud->rx = x;
+	cloud->ry = y;
+	if (yours)
+		set_heros_fault(cloud);		/* assume player has created it */
+	else clear_heros_fault(cloud);
+    cloud->inside_f = INSIDE_AETHER_CLOUD;
+    cloud->expire_f = EXPIRE_AETHER_CLOUD;
     cloud->arg = (genericptr_t)(intptr_t)damage;
     cloud->visible = TRUE;
     cloud->glyph = cmap_to_glyph(S_vapors);

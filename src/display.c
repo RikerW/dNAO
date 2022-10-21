@@ -1808,6 +1808,7 @@ back_to_glyph(x,y)
 	case DUST_CLOUD:		idx = S_dust;	  break;
 	case EMBERS:		idx = S_embers;	  break;
 	case VAPORS:		idx = S_vapors;	  break;
+	case AETHER:		idx = S_aether;	  break;
 	case WATER:		idx = S_water;	  break;
 	case DBWALL:
 	    idx = (ptr->horizontal) ? S_hcdbridge : S_vcdbridge;
@@ -1917,11 +1918,12 @@ static const char *type_names[MAX_TYPE] = {
 	"TRCORNER",	"BLCORNER",	"BRCORNER",	"CROSSWALL",
 	"TUWALL",	"TDWALL",	"TLWALL",	"TRWALL",
 	"DBWALL",	"SDOOR",	"SCORR",	"POOL",
-	"MOAT",		"WATER",	"DRAWBRIDGE_UP","LAVAPOOL",
-	"DEADTREE", "DOOR",		"CORR",		"ROOM",		"STAIRS",
+	"MOAT",		"WATER",	"DRAWBRIDGE_UP",	"LAVAPOOL",
+	"DEADTREE", "DOOR",		"CORR",		"ROOM",	"STAIRS",
 	"LADDER",	"FOUNTAIN",	"THRONE",	"SINK",
 	"ALTAR",	"ICE",		"GRASS",	"SOIL",	"SAND",	
-	"DRAWBRIDGE_DOWN","AIR", "CLOUD", "FOG", "DUST_CLOUD", "EMBERS", "VAPORS", "PUDDLE"
+	"DRAWBRIDGE_DOWN","AIR","CLOUD",	"FOG",	"DUST_CLOUD",
+	"EMBERS",	"VAPORS",	"AETHER",	"PUDDLE"
 };
 
 
