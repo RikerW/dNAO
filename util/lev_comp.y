@@ -96,6 +96,7 @@ stair *tmpstair[MAX_OF_TYPE];
 gold *tmpgold[MAX_OF_TYPE];
 engraving *tmpengraving[MAX_OF_TYPE];
 fountain *tmpfountain[MAX_OF_TYPE];
+forge *tmpforge[MAX_OF_TYPE];
 sink *tmpsink[MAX_OF_TYPE];
 pool *tmppool[MAX_OF_TYPE];
 
@@ -115,7 +116,7 @@ int n_olist = 0, n_mlist = 0, n_plist = 0;
 unsigned int nlreg = 0, nreg = 0, ndoor = 0, ntrap = 0, nmons = 0, nobj = 0;
 unsigned int ndb = 0, nwalk = 0, npart = 0, ndig = 0, nlad = 0, nstair = 0;
 unsigned int naltar = 0, ncorridor = 0, nrooms = 0, ngold = 0, nengraving = 0;
-unsigned int nfountain = 0, npool = 0, nsink = 0, npass = 0;
+unsigned int nfountain = 0, nforge = 0, npool = 0, nsink = 0, npass = 0;
 
 static int lev_flags = 0;
 
@@ -148,7 +149,7 @@ extern const char *fname;
 %token	<i> RANDOM_OBJECTS_ID RANDOM_MONSTERS_ID RANDOM_PLACES_ID
 %token	<i> ALTAR_ID LADDER_ID STAIR_ID NON_DIGGABLE_ID NON_PASSWALL_ID ROOM_ID
 %token	<i> PORTAL_ID TELEPRT_ID BRANCH_ID LEV CHANCE_ID
-%token	<i> CORRIDOR_ID GOLD_ID ENGRAVING_ID FOUNTAIN_ID POOL_ID SINK_ID NONE
+%token	<i> CORRIDOR_ID GOLD_ID ENGRAVING_ID FOUNTAIN_ID FORGE_ID POOL_ID SINK_ID NONE
 %token	<i> RAND_CORRIDOR_ID DOOR_STATE LIGHT_STATE CURSE_TYPE ENGRAVING_TYPE
 %token	<i> DIRECTION RANDOM_TYPE O_REGISTER M_REGISTER P_REGISTER A_REGISTER
 %token	<i> ALIGNMENT LEFT_OR_RIGHT CENTER TOP_OR_BOT ALTAR_TYPE UP_OR_DOWN
@@ -559,6 +560,7 @@ room_detail	: room_name
 		| trap_detail
 		| altar_detail
 		| fountain_detail
+		| forge_detail
 		| sink_detail
 		| pool_detail
 		| gold_detail
@@ -579,8 +581,6 @@ room_chance	: CHANCE_ID ':' INTEGER
 		   {
 			if (tmproom[nrooms]->chance)
 			    yyerror("This room already assigned a chance!");
-			else if (tmproom[nrooms]->rtype == OROOM)
-			    yyerror("Only typed rooms can have a chance!");
 			else if ($3 < 1 || $3 > 99)
 			    yyerror("The chance is supposed to be percentile.");
 			else
@@ -824,6 +824,7 @@ map_detail	: monster_detail
 		| branch_region
 		| altar_detail
 		| fountain_detail
+		| forge_detail
 		| mazewalk_detail
 		| wallify_detail
 		| ladder_detail
@@ -852,13 +853,19 @@ monster_detail	: MONSTER_ID chance ':' monster_c ',' m_name ',' coordinate '[' S
 			    check_coord(current_coord.x, current_coord.y,
 					"Monster");
 			if ($6) {
-			    int token = get_monster_id($6, (char) $<i>4);
-			    if (token == ERR)
-				yywarning(
-			      "Invalid monster name!  Making random monster.");
-			    else
-				tmpmonst[nmons]->id = token;
-			    Free($6);
+				if($4=='#')
+				{
+					tmpmonst[nmons]->name.str = $6;
+				}
+				else {
+					int token = get_monster_id($6, (char) $<i>4);
+					if (token == ERR)
+					yywarning(
+					  "Invalid monster name!  Making random monster.");
+					else
+					tmpmonst[nmons]->id = token;
+					Free($6);
+					}
 			}
 		  }
 		 monster_infos
@@ -886,13 +893,19 @@ monster_detail	: MONSTER_ID chance ':' monster_c ',' m_name ',' coordinate '[' S
 			    check_coord(current_coord.x, current_coord.y,
 					"Monster");
 			if ($6) {
-			    int token = get_monster_id($6, (char) $<i>4);
-			    if (token == ERR)
-				yywarning(
-			      "Invalid monster name!  Making random monster.");
-			    else
-				tmpmonst[nmons]->id = token;
-			    Free($6);
+				if($4=='#')
+				{
+					tmpmonst[nmons]->name.str = $6;
+				}
+				else {
+					int token = get_monster_id($6, (char) $<i>4);
+					if (token == ERR)
+					yywarning(
+					  "Invalid monster name!  Making random monster.");
+					else
+					tmpmonst[nmons]->id = token;
+					Free($6);
+				}
 			}
 		  }
 		 monster_infos
@@ -960,13 +973,13 @@ object_desc	: chance ':' object_c ',' o_name
 					tmpobj[nobj]->class = '#';
 				}
 				else{
-				int token = get_object_id($5, $<i>3);
-				if (token == ERR)
-				yywarning(
-				"Illegal object name!  Making random object.");
-				else
-				tmpobj[nobj]->id = token;
-				Free($5);
+					int token = get_object_id($5, $<i>3);
+					if (token == ERR)
+					yywarning(
+					"Illegal object name!  Making random object.");
+					else
+					tmpobj[nobj]->id = token;
+					Free($5);
 				}
 			}
 			
@@ -1381,6 +1394,22 @@ fountain_detail : FOUNTAIN_ID ':' coordinate
 		  }
 		;
 
+forge_detail : FORGE_ID ':' coordinate
+		  {
+			tmpforge[nforge] = New(forge);
+			tmpforge[nforge]->x = current_coord.x;
+			tmpforge[nforge]->y = current_coord.y;
+			if (!in_room)
+			    check_coord(current_coord.x, current_coord.y,
+					"Forge");
+			nforge++;
+			if (nforge >= MAX_OF_TYPE) {
+			    yyerror("Too many forges in room or mazepart!");
+			    nforge--;
+			}
+		  }
+		;
+
 sink_detail : SINK_ID ':' coordinate
 		  {
 			tmpsink[nsink] = New(sink);
@@ -1721,7 +1750,8 @@ place		: coord
 
 monster		: CHAR
 		  {
-			if (check_monster_char((char) $1))
+			char c = (char) $1;
+			if (check_monster_char(c)||c=='#')
 				$<i>$ = $1 ;
 			else {
 				yyerror("Unknown monster class!");

@@ -492,19 +492,12 @@ display_monster(x, y, mon, sightflags, worm_tail)
 	    else
 		num = peacenum_to_glyph(appear);
 	}
-	else if (!Hallucination && (
-				has_template(mon, VAMPIRIC) ||
-				has_template(mon, ZOMBIFIED) ||
-				has_template(mon, SKELIFIED) ||
-				has_template(mon, CRYSTALFIED) ||
-				has_template(mon, SLIME_REMNANT) ||
-				has_template(mon, FRACTURED)
-			)) {
+	else if (!Hallucination && mon->mtemplate != 0) {
 	    if (worm_tail) num = mon->mtyp == PM_HUNTING_HORROR ?
-			zombienum_to_glyph(PM_HUNTING_HORROR_TAIL):
-			zombienum_to_glyph(PM_LONG_WORM_TAIL);
+			mtemplatenum_to_glyph(PM_HUNTING_HORROR_TAIL, mon->mtemplate):
+			mtemplatenum_to_glyph(PM_LONG_WORM_TAIL, mon->mtemplate);
 	    else
-		num = zombienum_to_glyph(appear);
+		num = mtemplatenum_to_glyph(appear, mon->mtemplate);
 	/* [ALI] Only use detected glyphs when monster wouldn't be
 	 * visible by any other means.
 	 */
@@ -1464,8 +1457,8 @@ show_glyph(x,y,glyph)
 	    text = "detected mon";	offset = glyph - GLYPH_DETECT_OFF;
 	} else if (glyph >= GLYPH_INVIS_OFF) {		/* invisible mon */
 	    text = "invisible mon";	offset = glyph - GLYPH_INVIS_OFF;
-	} else if (glyph >= GLYPH_ZOMBIE_OFF) {		/* a zombie */
-	    text = "zombie";		offset = glyph - GLYPH_ZOMBIE_OFF;
+	} else if (glyph >= GLYPH_MTEMPLATE_OFF) {		/* a zombie */
+	    text = "mtemplate";		offset = glyph - GLYPH_MTEMPLATE_OFF;
 	} else if (glyph >= GLYPH_PEACE_OFF) {		/* a peaceful monster */
 	    text = "peaceful mon";		offset = glyph - GLYPH_PEACE_OFF;
 	} else if (glyph >= GLYPH_PET_OFF) {		/* a pet */
@@ -1627,8 +1620,8 @@ int glyph;
 	ch = def_monsyms[(int)mons[offset].mlet];
     } else if ((offset = (glyph - GLYPH_INVIS_OFF)) >= 0) {  /* invisible */
 	ch = DEF_INVISIBLE;
-    } else if ((offset = (glyph - GLYPH_ZOMBIE_OFF)) >= 0) {	/* a zombie */
-	ch = def_monsyms[(int)mons[offset].mlet];
+    } else if ((offset = (glyph - GLYPH_MTEMPLATE_OFF)) >= 0) {	/* a templated monster */
+	ch = def_monsyms[(int)mons[offset % NUMMONS].mlet];
     } else if ((offset = (glyph - GLYPH_PEACE_OFF)) >= 0) {	/* a peaceful monster */
 	ch = def_monsyms[(int)mons[offset].mlet];
     } else if ((offset = (glyph - GLYPH_PET_OFF)) >= 0) {	/* a pet */
@@ -1690,7 +1683,9 @@ int style;
 	bot1str(buf);
 	ptr = (char *) compress_str((const char *) buf);
 	dump("", ptr);
-	bot2str(buf);
+	bot2str(buf, FALSE, 0, TRUE);
+	dump("", buf);
+	bot3str(buf, FALSE, 0);
 	dump("", buf);
 	dump("", "");
 	dump("", "");
@@ -1709,7 +1704,9 @@ int style;
 	bot1str(buf);
 	ptr = (char *) compress_str((const char *) buf);
 	dump("", ptr);
-	bot2str(buf);
+	bot2str(buf, FALSE, 0, TRUE);
+	dump("", buf);
+	bot3str(buf, FALSE, 0);
 	dump("", buf);
     }
 }
@@ -1785,6 +1782,7 @@ back_to_glyph(x,y)
 	    idx = (ptr->ladder & LA_DOWN) ? S_dnladder : S_upladder;
 	    break;
 	case FOUNTAIN:		idx = S_fountain; break;
+	case FORGE:		idx = S_forge; break;
 	case SINK:		idx = S_sink;     break;
 	case ALTAR:		idx = S_altar;    break;
 	case GRAVE:		idx = S_grave;    break;
@@ -1805,8 +1803,8 @@ back_to_glyph(x,y)
 	case CLOUD:		idx = S_cloud;	  break;
 	case PUDDLE:		idx = S_puddle;	  break;
 	case FOG:		idx = S_fog;	  break;
-	case DUST_CLOUD:		idx = S_dust;	  break;
 	case EMBERS:		idx = S_embers;	  break;
+	case DUST_CLOUD:		idx = S_dust;	  break;
 	case VAPORS:		idx = S_vapors;	  break;
 	case AETHER:		idx = S_aether;	  break;
 	case WATER:		idx = S_water;	  break;
@@ -1918,9 +1916,9 @@ static const char *type_names[MAX_TYPE] = {
 	"TRCORNER",	"BLCORNER",	"BRCORNER",	"CROSSWALL",
 	"TUWALL",	"TDWALL",	"TLWALL",	"TRWALL",
 	"DBWALL",	"SDOOR",	"SCORR",	"POOL",
-	"MOAT",		"WATER",	"DRAWBRIDGE_UP",	"LAVAPOOL",
-	"DEADTREE", "DOOR",		"CORR",		"ROOM",	"STAIRS",
-	"LADDER",	"FOUNTAIN",	"THRONE",	"SINK",
+	"MOAT",		"WATER",	"DRAWBRIDGE_UP","LAVAPOOL",
+	"DEADTREE", "DOOR",		"CORR",		"ROOM",		"STAIRS",
+	"LADDER",	"FOUNTAIN",	"FORGE",	"THRONE",	"SINK",
 	"ALTAR",	"ICE",		"GRASS",	"SOIL",	"SAND",	
 	"DRAWBRIDGE_DOWN","AIR","CLOUD",	"FOG",	"DUST_CLOUD",
 	"EMBERS",	"VAPORS",	"AETHER",	"PUDDLE"

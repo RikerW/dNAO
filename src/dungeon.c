@@ -826,6 +826,7 @@ init_dungeons()		/* initialize the "dungeon" structs */
 	struct proto_dungeon pd;
 	struct level_map *lev_map;
 	struct version_info vers_info;
+	boolean quest_i;
 	
 	pd.n_levs = pd.n_brs = 0;
 
@@ -901,10 +902,20 @@ init_dungeons()		/* initialize the "dungeon" structs */
 	    dungeons[i].boneid = pd.tmpdungeon[i].boneschar;
 
 	    if(pd.tmpdungeon[i].lev.rand)
-		dungeons[i].num_dunlevs = (int)rn1(pd.tmpdungeon[i].lev.rand,
-						     pd.tmpdungeon[i].lev.base);
+			dungeons[i].num_dunlevs = (int)rn1(pd.tmpdungeon[i].lev.rand,
+								 pd.tmpdungeon[i].lev.base);
 	    else dungeons[i].num_dunlevs = (int)pd.tmpdungeon[i].lev.base;
-
+		
+		if(!strcmp(dungeons[i].dname, "The Quest")){
+			quest_i = TRUE;
+			if(urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH){
+				if(dungeons[i].num_dunlevs < 6){
+					dungeons[i].num_dunlevs = 6;
+				}
+			}
+		}
+		else quest_i = FALSE;
+		
 	    if(!i) {
 		dungeons[i].ledger_start = 0;
 		dungeons[i].depth_start = 1;
@@ -990,10 +1001,23 @@ init_dungeons()		/* initialize the "dungeon" structs */
 	     * special levels until they are all placed.
 	     */
 	    for(; cl < pd.n_levs; cl++) {
-		Fread((genericptr_t)&pd.tmplevel[cl],
-					sizeof(struct tmplevel), 1, dgn_file);
-		init_level(i, cl, &pd);
+			Fread((genericptr_t)&pd.tmplevel[cl],
+						sizeof(struct tmplevel), 1, dgn_file);
+			init_level(i, cl, &pd);
 	    }
+		//If the quest is long enough, move the locate level to create one to two of each filler level
+		//	New levels are added to the end of tmplevel, this asumes that the locate level is 2nd to last :(
+		if(quest_i){
+			if(urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH){
+				pd.tmplevel[pd.n_levs-2].lev.base++;
+			}
+			else if(dungeons[i].num_dunlevs == 7){
+				pd.tmplevel[pd.n_levs-2].lev.base++;
+			}
+			else if(dungeons[i].num_dunlevs == 6){
+				pd.tmplevel[pd.n_levs-2].lev.base += rn2(2);
+			}
+		}
 	    /*
 	     * Recursively place the generated levels for this dungeon.  This
 	     * routine will attempt all possible combinations before giving
@@ -1234,6 +1258,21 @@ Is_branchlev(lev)
 		return curr;
 	}
 	return (branch *) 0;
+}
+
+d_level *
+branchlev_other_end(bptr, lev)
+branch * bptr;
+d_level * lev;
+{
+	d_level * other_end;
+	if (bptr->end1.dnum == lev->dnum && bptr->end1.dlevel == lev->dlevel)
+		other_end = &(bptr->end2);
+	else if (bptr->end2.dnum == lev->dnum && bptr->end2.dlevel == lev->dlevel)
+		other_end = &(bptr->end1);
+	else
+		other_end = (d_level *)0;
+	return other_end;
 }
 
 /* goto the next level (or appropriate dungeon) */
@@ -1994,6 +2033,7 @@ print_branch(win, dnum, lower_bound, upper_bound, bymenu, lchoices)
 		add_menu(win, NO_GLYPH, &any, lchoices->menuletter,
 				0, ATR_NONE, buf, MENU_UNSELECTED);
 		if (lchoices->menuletter == 'z') lchoices->menuletter = 'A';
+		else if (lchoices->menuletter == 'Z') lchoices->menuletter = 'a';
 		else lchoices->menuletter++;
 		lchoices->idx++;
 	    } else
@@ -2061,6 +2101,7 @@ int *rdgn;		/* returns selected level dungeon number */
 				lchoices.dgn[lchoices.idx] = i;
 				add_menu(win, NO_GLYPH, &any, lchoices.menuletter, 0, dungeonsfirst ? ATR_NONE : iflags.menu_headings, buf, MENU_UNSELECTED);
 				if (lchoices.menuletter == 'z') lchoices.menuletter = 'A';
+				else if (lchoices.menuletter == 'Z') lchoices.menuletter = 'a';
 				else lchoices.menuletter++;
 				lchoices.idx++;
 			}
@@ -2447,6 +2488,7 @@ d_level *lev;
 
 #define INTEREST(feat) \
 	((feat).nfount) || \
+	((feat).nforge) || \
 	((feat).nsink) || \
 	((feat).ngrave) || \
 	((feat).nthrone) || \
@@ -2574,6 +2616,9 @@ recalc_mapseen()
 				break;
 			case FOUNTAIN:
 				mptr->feat.nfount = min(mptr->feat.nfount + 1, 3);
+				break;
+			case FORGE:
+				mptr->feat.nforge = min(mptr->feat.nforge + 1, 3);
 				break;
 			case GRAVE:
 				mptr->feat.ngrave = min(mptr->feat.ngrave + 1, 3);
@@ -2793,6 +2838,8 @@ boolean printdun;
 				Sprintf(eos(buf), " [Minauros]");
 			} else if(Is_belial_level(&mptr->lev)){
 				Sprintf(eos(buf), " [Phlegethos]");
+			} else if(Is_chromatic_level(&mptr->lev)){
+				Sprintf(eos(buf), " [Dragon Caves]");
 			} else {
 				Sprintf(eos(buf), " [Upper Hell]");
 			}
@@ -2854,10 +2901,10 @@ boolean printdun;
 				Sprintf(eos(buf), " [Third Abyss]");
 			}
 		}
-		else if(In_outlands(&u.uz)){
-			if(dunlev(&u.uz) == 1) Sprintf(eos(buf)," [Gatetown]");
-			else if(dunlev(&u.uz) == 6) Sprintf(eos(buf)," [Spire]");
-			else if(dunlev(&u.uz) == 7) Sprintf(eos(buf)," [Sum of All]");
+		else if(In_outlands(&mptr->lev)){
+			if(dunlev(&mptr->lev) == 1) Sprintf(eos(buf)," [Gatetown]");
+			else if(dunlev(&mptr->lev) == 6) Sprintf(eos(buf)," [Spire]");
+			else if(dunlev(&mptr->lev) == 7) Sprintf(eos(buf)," [Sum of All]");
 		}
 	}
 
@@ -2895,6 +2942,7 @@ boolean printdun;
 			Sprintf(eos(buf), " to %s", align_gname(u.ualign.type));
 
 		ADDNTOBUF("fountain", mptr->feat.nfount)
+		ADDNTOBUF("forge", mptr->feat.nforge)
 		ADDNTOBUF("sink", mptr->feat.nsink)
 		if(mptr->feat.nmorgue){
 			ADDNTOBUF("graveyard", mptr->feat.nmorgue)

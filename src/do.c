@@ -152,6 +152,15 @@ const char *verb;
 	/* make sure things like water_damage() have no pointers to follow */
 	obj->nobj = obj->nexthere = (struct obj *)0;
 
+	if(In_quest(&u.uz) && urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH && levl[x][y].typ == AIR && obj != uball && obj != uchain){
+		add_to_migration(obj);
+		obj->ox = u.uz.dnum;
+		obj->oy = qlocate_level.dlevel+1;
+		obj->owornmask = (long)MIGR_RANDOM;
+		newsym(x,y);
+		return TRUE;
+	}
+
 	if (is_boulder(obj) && boulder_hits_pool(obj, x, y, FALSE))
 		return TRUE;
 	else if (is_boulder(obj) && (t = t_at(x,y)) != 0 &&
@@ -216,7 +225,7 @@ const char *verb;
 		newsym(x,y);
 		return TRUE;
 	} else if (is_lava(x, y)) {
-		return fire_damage(obj, FALSE, FALSE, x, y);
+		return lava_damage(obj, x, y);
 	} else if (is_pool(x, y, TRUE)) {
 		/* Reasonably bulky objects (arbitrary) splash when dropped.
 		 * If you're floating above the water even small things make noise.
@@ -359,6 +368,10 @@ register struct obj *obj;
 	register boolean ideed = TRUE;
 
 	You("drop %s down the drain.", doname(obj));
+	if(obj->oartifact){
+		pline("But it seems to expand as if falls, and doesn't fit!");
+		goto giveback;
+	}
 	obj->in_use = TRUE;	/* block free identification via interrupt */
 	switch(obj->otyp) {	/* effects that can be noticed without eyes */
 		case RIN_WISHES:
@@ -736,7 +749,14 @@ struct obj *obj;
 			nmon = mtmp->nmon;
 			if(!DEADMONSTER(mtmp) && get_mx(mtmp, MX_ESUM)){
 				if(mtmp->mextra_p->esum_p->sm_o_id == obj->o_id){
-					monvanished(mtmp);
+					update_skull_mon(mtmp, obj);
+					if(!get_mx(mtmp, MX_ESUM))
+						impossible("Non-summoned skull monster in obj_no_longer_held");
+					else {
+						int dur = timer_duration_remaining(get_timer(mtmp->timed, DESUMMON_MON));
+						mtmp->mextra_p->esum_p->permanent = 0;
+						abjure_summon(mtmp, dur);
+					}
 				}
 			}
 		}
@@ -945,14 +965,24 @@ dodown()
 					if (Is_hell3(&u.uz) && !(u.ux == xupstair && u.uy == yupstair)){
 						pline("These stairs are fake!");
 						levl[u.ux][u.uy].typ = ROOM;
-					} else pline("These stairs don't go down!");
+						newsym(u.ux, u.uy);
+					} else {
+						if(levl[u.ux][u.uy].ladder != LA_DOWN){
+							pline("These stairs don't go down!");
+						}
+						else {
+							pline("These stairs have been blocked by rubble!");
+							levl[u.ux][u.uy].typ = ROOM;
+							newsym(u.ux, u.uy);
+						}
+					}
 				}
 				else You_cant("go down here.");
 				return MOVE_CANCELLED;
 			}
 		}
 	}
-	if(u.ustuck) {
+	if(u.ustuck && (u.uswallow || !sticks(&youmonst))) {
 		You("are %s, and cannot go down.",
 			!u.uswallow ? "being held" : is_animal(u.ustuck->data) ?
 			"swallowed" : "engulfed");
@@ -1023,7 +1053,14 @@ doup()
 		}
 		else{
 			if(levl[u.ux][u.uy].typ == STAIRS){
-				pline("These stairs don't go up!");
+				if(levl[u.ux][u.uy].ladder != LA_UP){
+					pline("These stairs don't go up!");
+				}
+				else {
+					pline("These stairs have been blocked by rubble!");
+					levl[u.ux][u.uy].typ = ROOM;
+					newsym(u.ux, u.uy);
+				}
 			}
 			else You_cant("go up here.");
 		}
@@ -1038,7 +1075,7 @@ doup()
 		return MOVE_CANCELLED;
 	} else
 #endif
-	if(u.ustuck) {
+	if(u.ustuck && (u.uswallow || !sticks(&youmonst))) {
 		You("are %s, and cannot go up.",
 			!u.uswallow ? "being held" : is_animal(u.ustuck->data) ?
 			"swallowed" : "engulfed");
@@ -1455,9 +1492,9 @@ remake:
 					} else {
 						You("come into contact with your energy sword%s.", (mainsaber && secsaber && (lrole >= ACURR(A_DEX) || (mainsaber_locked && secsaber_locked))) ? "s" : "");
 						if(mainsaber && (mainsaber_locked || lrole >= ACURR(A_DEX)))
-							losehp(dmgval(uwep,&youmonst,0), "falling downstairs with a lit lightsaber", KILLED_BY);
+							losehp(dmgval(uwep,&youmonst,0,&youmonst), "falling downstairs with a lit lightsaber", KILLED_BY);
 						if(secsaber && (secsaber_locked || lrole >= ACURR(A_DEX)))
-							losehp(dmgval(uswapwep,&youmonst,0), "falling downstairs with a lit lightsaber", KILLED_BY);
+							losehp(dmgval(uswapwep,&youmonst,0,&youmonst), "falling downstairs with a lit lightsaber", KILLED_BY);
 					}
 					if(mainsaber && !mainsaber_locked)
 						lightsaber_deactivate(uwep, TRUE);
@@ -1468,8 +1505,8 @@ remake:
 						You("hurriedly deactivate your energy sword%s.", (mainsaber && secsaber) ? "s" : "");
 					} else {
 						You("come into contact with your energy sword%s.", (mainsaber && secsaber) ? "s" : "");
-						if(mainsaber) losehp(dmgval(uwep,&youmonst,0), "falling downstairs with a lit lightsaber", KILLED_BY);
-						if(secsaber) losehp(dmgval(uswapwep,&youmonst,0), "falling downstairs with a lit lightsaber", KILLED_BY);
+						if(mainsaber) losehp(dmgval(uwep,&youmonst,0,&youmonst), "falling downstairs with a lit lightsaber", KILLED_BY);
+						if(secsaber) losehp(dmgval(uswapwep,&youmonst,0,&youmonst), "falling downstairs with a lit lightsaber", KILLED_BY);
 					}
 					if(mainsaber) lightsaber_deactivate(uwep, TRUE);
 					if(secsaber) lightsaber_deactivate(uswapwep, TRUE);
@@ -1634,8 +1671,17 @@ misc_levelport:
 	    You("enter what seems to be an older, more primitive world.");
 #endif
 	/* Final confrontation */
-	if (In_endgame(&u.uz) && newdungeon && u.uhave.amulet)
-		resurrect();
+	if (In_endgame(&u.uz) && newdungeon && u.uhave.amulet){
+		if(Role_if(PM_MADMAN) && Race_if(PM_ELF)){
+			makemon(&mons[flags.initgend ? PM_PUPPET_EMPEROR_XELETH : PM_PUPPET_EMPRESS_XEDALLI], u.ux, u.uy, MM_ADJACENTOK);
+			verbalize("Why won't you JUST. STAY. DEAD!?");
+			makemon(&mons[PM_FLAXEN_STAR_PHANTOM], u.ux, u.uy, MM_ADJACENTOK);
+			makemon(&mons[PM_FLAXEN_STARSHADOW], u.ux, u.uy, MM_ADJACENTOK);
+			makemon(&mons[PM_FLAXEN_STARSHADOW], u.ux, u.uy, MM_ADJACENTOK);
+		}
+		else
+			resurrect();
+	}
 	if (newdungeon && In_V_tower(&u.uz) && In_hell(&u.uz0))
 		pline_The("heat and smoke are gone.");
 
@@ -1651,6 +1697,15 @@ misc_levelport:
 			else {
 				You("receive a faint telepathic message from Lady Constance:");
 				pline("Your help is urgently needed at Archer Asylum!  Look for a ...ic transporter.");
+				pline("You couldn't quite make out that last message.");
+			}
+		} else if(Role_if(PM_HEALER) && Race_if(PM_DROW)){
+			if(u.uevent.qcalled){
+				You("again sense Sister T'eirastra pleading for help.");
+			}
+			else {
+				You("receive a faint telepathic message from T'eirastra:");
+				pline("Your help is urgently needed at Menzoberranzan!  Look for a ...ic transporter.");
 				pline("You couldn't quite make out that last message.");
 			}
 		} else {
@@ -1718,10 +1773,55 @@ final_level()
 		(void) makemon(&mons[PM_ANCIENT_OF_ICE], u.ux, u.uy, MM_ADJACENTOK);
 /*		for(host = 0; host < 10; host++ )*/ (void) makemon(&mons[PM_FALLEN_ANGEL], u.ux, u.uy, MM_ADJACENTOK);
 	}
+	if(Role_if(PM_MADMAN) && Race_if(PM_ELF)){
+		makemon(&mons[PM_FLAXEN_STAR_PHANTOM], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STAR_PHANTOM], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STAR_PHANTOM], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STAR_PHANTOM], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STAR_PHANTOM], 0, 0, MM_ADJACENTOK);
+
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_FLAXEN_STARSHADOW], 0, 0, MM_ADJACENTOK);
+
+		makemon(&mons[PM_CARCOSAN_COURTIER], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_CARCOSAN_COURTIER], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_CARCOSAN_COURTIER], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_CARCOSAN_COURTIER], 0, 0, MM_ADJACENTOK);
+		makemon(&mons[PM_CARCOSAN_COURTIER], 0, 0, MM_ADJACENTOK);
+	}
 	/* create a guardian angel next to player, if worthy */
-	if (Conflict) {
-	    pline(
-	     "A voice booms: \"Thy desire for conflict shall be fulfilled!\"");
+	if(!u.veil){
+		You("notice the air thrums with hidden holy energy.");
+	}
+	/* create a guardian angel next to player, if worthy */
+	if (Conflict || u.ualign.type == A_VOID || u.ualign.type == A_NONE) {
+		if(Conflict)
+			pline(
+			 "A voice booms: \"Thy desire for conflict shall be fulfilled!\"");
+		else
+			pline("A voice booms: \"Die, heretic!\"");
 	    for (i = rnd(4); i > 0; --i) {
 		mm.x = u.ux;
 		mm.y = u.uy;
@@ -1769,13 +1869,18 @@ final_level()
 static char *dfr_pre_msg = 0,	/* pline() before level change */
 	    *dfr_post_msg = 0;	/* pline() after level change */
 
+static int dfr_post_dmg = 0;
+static int dfr_post_san = 0;
+
 /* change levels at the end of this turn, after monsters finish moving */
 void
-schedule_goto(tolev, at_stairs, falling, portal_flag, pre_msg, post_msg)
+schedule_goto(tolev, at_stairs, falling, portal_flag, pre_msg, post_msg, post_dmg, post_san)
 d_level *tolev;
 boolean at_stairs, falling;
 int portal_flag;
 const char *pre_msg, *post_msg;
+int post_dmg;
+int post_san;
 {
 	int typmask = 0100;		/* non-zero triggers `deferred_goto' */
 
@@ -1793,6 +1898,10 @@ const char *pre_msg, *post_msg;
 	    dfr_pre_msg = strcpy((char *)alloc(strlen(pre_msg) + 1), pre_msg);
 	if (post_msg)
 	    dfr_post_msg = strcpy((char *)alloc(strlen(post_msg)+1), post_msg);
+	if(post_dmg)
+		dfr_post_dmg = post_dmg;
+	if(post_san)
+		dfr_post_san = post_san;
 }
 
 /* handle something like portal ejection */
@@ -1815,6 +1924,14 @@ deferred_goto()
 		}
 	    }
 	    if (dfr_post_msg) pline1(dfr_post_msg);
+		if (dfr_post_dmg){
+			losehp(dfr_post_dmg, "abrupt arrival", KILLED_BY_AN);
+			dfr_post_dmg = 0;
+		}
+		if (dfr_post_san){
+			change_usanity(dfr_post_san, dfr_post_san < 0);
+			dfr_post_san = 0;
+		}
 	}
 	u.utotype = 0;		/* our caller keys off of this */
 	if (dfr_pre_msg)
@@ -1874,7 +1991,13 @@ int different;
 	chewed = !different && (mtmp->mhp < mtmp->mhpmax);
 	if (chewed) cname = cname_buf;	/* include "bite-covered" prefix */
 	if(different==REVIVE_ZOMBIE){
-		set_template(mtmp, ZOMBIFIED);
+		if(mtmp->mspores){
+			set_template(mtmp, SPORE_ZOMBIE);
+			mtmp->mspores = 0;
+		}
+		else {
+			set_template(mtmp, ZOMBIFIED);
+		}
 		mtmp->zombify = 0;
 		if(mtmp->mpeaceful && !mtmp->mtame){
 			mtmp->mpeaceful = 0;
@@ -1900,6 +2023,10 @@ int different;
 				Your("weapon goes slimy.");
 				pline("%s slips out of your grasp!", Monnam(mtmp));
 		    }
+		    else if (different==GROW_BBLOOM) {
+				Your("weapon sprouts flowers.");
+				pline("%s pushes out of your grasp!", Monnam(mtmp));
+		    }
 		    else if (different==REVIVE_ZOMBIE || different==REVIVE_YELLOW) {
 				pline_The("%s rises from the dead!", cname);
 				pline("%s writhes out of your grasp!", Monnam(mtmp));
@@ -1923,6 +2050,9 @@ int different;
 		    else if (different==GROW_SLIME)
 				pline("%s leaks from a putrefying corpse!",
 				  Amonnam(mtmp));
+		    else if (different==GROW_BBLOOM)
+				pline("%s sprouts from a corpse!",
+				  Amonnam(mtmp));
 		    else if (different==REVIVE_ZOMBIE || different==REVIVE_YELLOW)
 				pline("%s rises from the dead!",
 				  Amonnam(mtmp));
@@ -1934,29 +2064,8 @@ int different;
 			else
 				pline("%s rises from the dead!", chewed ?
 					Adjmonnam(mtmp, "bite-covered") : Monnam(mtmp));
-			if(level.objects[ox][oy] && !mtmp->menvy){
-				struct obj *cur;
-				struct obj *nobj;
-				for(cur = level.objects[ox][oy]; cur; cur = nobj){
-					nobj = cur->nexthere;
-					/* Monsters don't pick up your ball and chain */
-					if(cur == uball || cur == uchain)
-						continue;
-
-					/* Monsters don't pick up bolted magic chests */
-					if(cur->otyp == MAGIC_CHEST && cur->obolted)
-						continue;
-
-					if(likes_obj(mtmp, cur) || can_equip(mtmp, cur)){
-						obj_extract_self(cur);
-						mpickobj(mtmp, cur);
-					}
-				}
-				m_dowear(mtmp, TRUE);
-				init_mon_wield_item(mtmp);
-				m_level_up_intrinsic(mtmp);
-			}
 		}
+		start_timer(0, TIMER_MONSTER, REVIVE_PICKUP, (genericptr_t)mtmp);
 		break;
 
 	    case OBJ_MINVENT:		/* probably a nymph's */
@@ -1966,6 +2075,7 @@ int different;
 			      mon_nam(mcarry), different ? "a corpse" : an(cname),
 			      different==GROW_MOLD ? "goes moldy" : 
 			      different==GROW_SLIME ? "putrefies" : 
+			      different==GROW_BBLOOM ? "sprouts" : 
 			      different==REVIVE_ZOMBIE ? "rises from the dead" : 
 			      different==REVIVE_YELLOW ? "rises from the dead" : 
 			      different==REVIVE_SHADE ? "dissolves into shadow" : 
@@ -2030,6 +2140,44 @@ long timeout;
     }
 }
 
+/* 
+ * Monster picks up and equips all items it likes/can wear on its square.
+ * For use with reviving, so this only happens when timers run, so *after*
+ * all bhito effects finish in the case of a wand affecting a rider corpse
+ */
+void
+revive_mon_pickup(arg, timeout)
+genericptr_t arg;
+long timeout;
+{
+	struct monst *mtmp = (struct monst *) arg;
+
+	if (timeout != monstermoves)
+		return;
+
+	if(level.objects[mtmp->mx][mtmp->my] && !mtmp->menvy){
+		struct obj *cur;
+		struct obj *nobj;
+		for(cur = level.objects[mtmp->mx][mtmp->my]; cur; cur = nobj){
+			nobj = cur->nexthere;
+			/* Monsters don't pick up your ball and chain */
+			if(cur == uball || cur == uchain)
+				continue;
+
+			/* Monsters don't pick up bolted magic chests */
+			if(cur->otyp == MAGIC_CHEST && cur->obolted)
+				continue;
+
+			if(likes_obj(mtmp, cur) || can_equip(mtmp, cur)){
+				obj_extract_self(cur);
+				mpickobj(mtmp, cur);
+			}
+		}
+		m_dowear(mtmp, TRUE);
+		init_mon_wield_item(mtmp);
+		m_level_up_intrinsic(mtmp);
+	}
+}
 
 static const int molds[] = 
 {
@@ -2072,10 +2220,19 @@ long timeout;
 	/* Turn the corpse into a mold corpse if molds are available */
 	oldtyp = body->corpsenm;
 
-	/* Weight towards non-motile fungi.
-	 */
-	//	fruitadd("slime mold");
-	pmtype = molds[rn2(SIZE(molds))];
+	struct monst *attchmon = 0;
+	if(get_ox(body, OX_EMON)) attchmon = EMON(body);
+	if(attchmon && attchmon->brainblooms){
+		pmtype = PM_BRAINBLOSSOM_PATCH;
+		rem_ox(body, OX_EMON);
+		attchmon = 0;
+	}
+	else {
+		/* Weight towards non-motile fungi.
+		 */
+		//	fruitadd("slime mold");
+		pmtype = molds[rn2(SIZE(molds))];
+	}
 
 	/* [ALI] Molds don't grow in adverse conditions.  If it ever
 	 * becomes possible for molds to grow in containers we should
@@ -2111,7 +2268,7 @@ long timeout;
 			if (body->where == OBJ_INVENT)
 				body->quan++;
 			oldquan = body->quan;
-			if (revive_corpse(body, GROW_MOLD)) {
+			if (revive_corpse(body, (pmtype == PM_BRAINBLOSSOM_PATCH) ? GROW_BBLOOM : GROW_MOLD)) {
 				if (oldquan != 1) {		/* Corpse still valid */
 					body->corpsenm = oldtyp;
 					if (body->where == OBJ_INVENT) {
@@ -2294,7 +2451,7 @@ long timeout;
 	
 	if (pmtype != -1) {
 		/* We don't want special case revivals */
-		if (cant_create(&pmtype, TRUE) || (get_ox(body, OX_EMON) && !(EMON(body)->zombify)))
+		if (cant_create(&pmtype, TRUE) || (get_ox(body, OX_EMON) && !(EMON(body)->zombify || EMON(body)->mspores)))
 			pmtype = -1; /* cantcreate might have changed it so change it back */
 		else {
 			body->corpsenm = pmtype;
@@ -2408,7 +2565,7 @@ donull()
 {
 	static long lastreped = -13;//hacky way to tell if the player has recently tried repairing themselves
 	u.unull = TRUE;
-
+	
 	if(uclockwork){
 		if(!Upolyd && u.uhp<u.uhpmax){
 			if(lastreped < monstermoves-13) You("attempt to make repairs.");

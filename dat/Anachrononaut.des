@@ -515,12 +515,14 @@ MONSTER:'@',"trooper",(16,08)
 MONSTER:'@',"trooper",(16,09)
 
 MONSTER:'@',"trooper",(16,10)
-MONSTER:'@',"trooper",(16,11)
-MONSTER:'@',"trooper",(17,12)
+
+MONSTER:'h',"dwarf warrior",(16,11)
 MONSTER:'@',"trooper",(16,12)
-MONSTER:'@',"trooper",(18,13)
 MONSTER:'@',"trooper",(17,13)
 MONSTER:'@',"trooper",(16,13)
+MONSTER:'@',"trooper",(18,14)
+MONSTER:'@',"trooper",(17,14)
+MONSTER:'@',"trooper",(16,14)
 
 
 MONSTER:'@',"trooper",(46,10)
@@ -651,6 +653,15 @@ MONSTER:'{',"razorvine",random
 MONSTER:'{',"razorvine",random
 MONSTER:'{',"razorvine",random
 MONSTER:'{',"razorvine",random
+
+MONSTER:'#',"cranium rodent of unusual size",random
+MONSTER:'#',"cranium rodent of unusual size",random
+MONSTER:'#',"cranium rodent of unusual size",random
+MONSTER:'#',"cranium rodent of unusual size",random
+MONSTER:'#',"cranium rodent of unusual size",random
+MONSTER:'#',"cranium rodent of unusual size",random
+MONSTER:'#',"cranium rodent of unusual size",random
+MONSTER:'#',"cranium rodent of unusual size",random
 
 # MONSTER:'w',"purple worm",random
 # MONSTER:'w',"purple worm",random
@@ -985,6 +996,49 @@ OBJECT:'(',"hypospray ampule",random
 OBJECT:'(',"hypospray ampule",random
 OBJECT:'(',"hypospray ampule",random
 
+GEOMETRY:center,center
+#0         1         2         3         4         5         6         7     
+#0123456789012345678901234567890123456789012345678901234567890123456789012345
+MAP
+0...........................................................................
+1...........................................................................
+2....................................------.................................
+3.........................................|.................................
+4----.......----..................|.     ....................---.........---
+5|.............|...............|..|.     ....|...............|.............|
+6|..---------.............--|..|..|.     ....|..|.......|...|-..--------...|
+7|..|.......|...-|.|-.......-|.|..|... ...|..|.|-.......-|.|-...|.......|..|
+8|..|.     .|....-|-....#....-||..----+----..||-.... ....-|-....|.     .|..|
+9|....      +.....+....###....||.............||....   ....+.....+      .|..|
+0|....     .|....-|-....#....-|--|.........|--|-.... ....-|-....|.     .|..|
+1|..........|...-|-|-.......-|...-|---+---|-...|-.......-|-|-...........|..|
+2|....-------..-|---|---+---|....|-.......-|....|.--+---|---|-..----...--..|
+3|- . . . . . .|- . . . . . . . |-. . # . .-| . . . . . . . -|- . . . . . .|
+4--.-.-.-.-.-.---.-.-.-.-.-.-.-.|....###....|.-.-.-.-.|.-.-.---.-.-.-.-.-.---
+5-- . . . . . . . . . . . . . . |-. . # . .-| . . . . . . . . . . . . . . . -
+6--.-.-.-.-.-.-.-.-.-.-.-.-.|.-.-|---------|-.-.|.-.-.-.-.-.-.-.-.-.-.-.-.-.-
+7-- . . . . . . . . . . . . . . . | - + - | . . . . . . . . . . . . . . . . -
+8--.-.-.-.-.-.-.-.-.-.-.-.-.--|---------------|.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-
+9-- . . . . . . . . . . . . . --. . . . . . .-- . . . . . . . . . . . . . . -
+0----------------------------------------------------------------------------
+ENDMAP
+
+OBJECT:'#',"color_white thoroughly rotted imperial elven helm",random
+OBJECT[75%]:'#',"color_bright_green thoroughly rotted imperial elven helm",random
+OBJECT[10%]:'#',"color_orange thoroughly rotted imperial elven helm",random
+
+OBJECT:'#',"color_bright_green thoroughly rotted imperial elven armor",random
+OBJECT[75%]:'#',"color_orange thoroughly rotted imperial elven armor",random
+OBJECT[10%]:'#',"color_gray thoroughly rotted imperial elven armor",random
+
+OBJECT:'#',"color_red thoroughly rotted imperial elven gauntlets",random
+OBJECT[75%]:'#',"color_gray thoroughly rotted imperial elven gauntlets",random
+OBJECT[10%]:'#',"color_bright_green thoroughly rotted imperial elven gauntlets",random
+
+OBJECT:'#',"color_bright_green thoroughly rotted imperial elven boots",random
+OBJECT[75%]:'#',"color_gray thoroughly rotted imperial elven boots",random
+OBJECT[10%]:'#',"color_red thoroughly rotted imperial elven boots",random
+
 OBJECT:random,random,random
 OBJECT:random,random,random
 OBJECT:random,random,random
@@ -1067,20 +1121,20 @@ MONSTER: 'U', "elder brain", (07,09), hostile
 MONSTER: 'U', "elder brain", (37,05), hostile
 MONSTER: 'U', "elder brain", (67,09), hostile
 
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
 
 MONSTER: 'h', "mind flayer", random
 MONSTER: 'h', "mind flayer", random
@@ -1117,6 +1171,12 @@ MONSTER: '\'', "semblance", random
 MONSTER: '\'', "semblance", random
 MONSTER: '\'', "semblance", random
 MONSTER: '\'', "semblance", random
+
+MONSTER: '#', "psurlon long worm", random
+MONSTER: '#', "psurlon long worm", random
+MONSTER: '#', "psurlon long worm", random
+
+MONSTER: '#', "psurlon purple worm", random
 
 # MONSTER: 'U', "umber hulk", random
 # MONSTER: 'U', "umber hulk", random
@@ -1229,13 +1289,13 @@ ENDMAP
 #0123456789012345678901234567890123456789012345678901234567890123456789012
 #0         1         2         3         4         5         6         7     
 
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
-MONSTER: '@', "mindless thrall", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
+MONSTER: '#', "hostile trooper husk", random
 
 MONSTER: '\'', "brain golem", random
 MONSTER: '\'', "brain golem", random

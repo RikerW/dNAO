@@ -134,6 +134,19 @@ not_capable()
 		
 		if(cumlev >= MIN_QUEST_LEVEL) return FALSE;
 	}
+	else if(Role_if(PM_HEALER)){
+		struct monst *petm;
+		int maxlev = 0;
+		for(petm = fmon; petm; petm = petm->nmon){
+			if(petm->mtame){
+				maxlev = max(maxlev, petm->m_lev);
+			}
+		}
+		maxlev = maxlev/2 + maxlev%2;
+		maxlev += u.ulevel/2;
+		
+		if(maxlev >= MIN_QUEST_LEVEL) return FALSE;
+	}
 	
 	if(Pantheon_if(PM_GNOME)) return((boolean)(u.ulevel < GNOMISH_MIN_QUEST_LEVEL));
 	else if(Race_if(PM_HALF_DRAGON) && Role_if(PM_NOBLEMAN) && flags.initgend) return FALSE;
@@ -203,7 +216,7 @@ boolean seal;
 		portal_flag = u.uevent.qexpelled ? 0 :	/* returned via artifact? */
 			  !seal ? 1 : -1;
 	}
-    schedule_goto(dest, FALSE, FALSE, portal_flag, (char *)0, (char *)0);
+    schedule_goto(dest, FALSE, FALSE, portal_flag, (char *)0, (char *)0,0, 0);
     if (seal) {	/* remove the portal to the quest - sealing it off */
 		int reexpelled = u.uevent.qexpelled;
 		u.uevent.qexpelled = 1;

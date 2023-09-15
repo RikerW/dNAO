@@ -605,6 +605,7 @@ struct obj * obj;
 		arti_light(obj) ||							/* artifact lightsource */
 		obj->otyp == POT_STARLIGHT ||				/* always lit potion */
 		obj->otyp == CHUNK_OF_FOSSIL_DARK ||		/* always dark rock */
+		obj->otyp == SUNLIGHT_MAGGOT ||				/* always lit hat */
 		(obj->otyp == SUNROD && obj->lamplit)		/* chemical reaction cannot be snuffed */
 		);
 }
@@ -618,6 +619,7 @@ obj_is_burning(obj)
     return (obj->lamplit &&
 		 (	ignitable(obj)					/* lightsource uses a flame */
 		 || obj->otyp == LANTERN			/* electric */
+		 || obj->otyp == LANTERN_PLATE_MAIL	/* electric */
 		 || obj->otyp == DWARVISH_HELM		/* electric */
 		 || (is_lightsaber(obj) && obj->oartifact != ART_INFINITY_S_MIRRORED_ARC && obj->otyp != KAMEREL_VAJRA)	/* future-electric */
 		 || obj->oartifact == ART_HOLY_MOONLIGHT_SWORD));	/* magical fire */

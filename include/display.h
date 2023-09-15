@@ -24,14 +24,14 @@
  * Returns true if the hero can sense the given monster.  This includes
  * monsters that are hiding or mimicing other monsters.
  */
+
+#define etele_dist ((uarmh && uarmh->oartifact == ART_ENFORCED_MIND) ? (BOLT_LIM * BOLT_LIM * 4) : (BOLT_LIM * BOLT_LIM))
 #define tp_sensemon(mon) (	/* The hero can always sense a monster IF:  */\
     (!mindless_mon(mon)) &&	/* 1. the monster has a brain to sense AND  */\
       ((Blind && Blind_telepat) ||	/* 2a. hero is blind and telepathic OR	    */\
 				/* 2b. hero is using a telepathy inducing   */\
 				/*	 object and in range		    */\
-      (Unblind_telepat &&					      \
-	(distu(mon->mx, mon->my) <= (BOLT_LIM * BOLT_LIM))))		      \
-)
+      (Unblind_telepat && (distu(mon->mx, mon->my) <= etele_dist))))
 
 #define sensemon(mon) (tp_sensemon(mon) || Detect_monsters || MATCH_WARN_OF_MON(mon) || sense_by_scent(mon))
 
@@ -321,8 +321,8 @@
 #define GLYPH_MON_OFF		0
 #define GLYPH_PET_OFF		(NUMMONS	+ GLYPH_MON_OFF)
 #define GLYPH_PEACE_OFF		(NUMMONS	+ GLYPH_PET_OFF)
-#define GLYPH_ZOMBIE_OFF	(NUMMONS	+ GLYPH_PEACE_OFF)
-#define GLYPH_INVIS_OFF		(NUMMONS	+ GLYPH_ZOMBIE_OFF)
+#define GLYPH_MTEMPLATE_OFF	(NUMMONS	+ GLYPH_PEACE_OFF)
+#define GLYPH_INVIS_OFF		(NUMMONS*MAXTEMPLATE	+ GLYPH_MTEMPLATE_OFF)
 #define GLYPH_DETECT_OFF	(1		+ GLYPH_INVIS_OFF)
 #define GLYPH_BODY_OFF		(NUMMONS	+ GLYPH_DETECT_OFF)
 #define GLYPH_RIDDEN_OFF	(NUMMONS	+ GLYPH_BODY_OFF)
@@ -344,7 +344,7 @@
 #define ridden_mon_to_glyph(mon) ((int) what_mon((mon)->mtyp, mon)+GLYPH_RIDDEN_OFF)
 #define pet_to_glyph(mon) ((int) what_mon((mon)->mtyp, mon)+GLYPH_PET_OFF)
 #define peace_to_glyph(mon) ((int) what_mon((mon)->mtyp, mon)+GLYPH_PEACE_OFF)
-#define zombie_to_glyph(mon) ((int) what_mon((mon)->mtyp, mon)+GLYPH_ZOMBIE_OFF)
+#define mtemplate_to_glyph(mon) ((int) what_mon((mon)->mtyp, mon)+GLYPH_MTEMPLATE_OFF)
 
 #define cmap_to_glyph(cmap_idx) ((int) (cmap_idx)   + GLYPH_CMAP_OFF)
 #define explosion_to_glyph(expltype,idx)	\
@@ -360,7 +360,7 @@
 #define ridden_monnum_to_glyph(mtyp)	((int) (mtyp) + GLYPH_RIDDEN_OFF)
 #define petnum_to_glyph(mtyp)	((int) (mtyp) + GLYPH_PET_OFF)
 #define peacenum_to_glyph(mtyp)	((int) (mtyp) + GLYPH_PEACE_OFF)
-#define zombienum_to_glyph(mtyp)	((int) (mtyp) + GLYPH_ZOMBIE_OFF)
+#define mtemplatenum_to_glyph(mtyp, mtemplate)	((int) (mtyp) + GLYPH_MTEMPLATE_OFF + NUMMONS*(mtemplate-1))
 
 /* The hero's glyph when seen as a monster.
  */
@@ -386,7 +386,7 @@
 	(glyph_is_normal_monster(glyph) ? ((glyph)-GLYPH_MON_OFF) :	\
 	glyph_is_pet(glyph) ? ((glyph)-GLYPH_PET_OFF) :			\
 	glyph_is_peace(glyph) ? ((glyph)-GLYPH_PEACE_OFF) :			\
-	glyph_is_zombie(glyph) ? ((glyph)-GLYPH_ZOMBIE_OFF) :			\
+	glyph_is_mtemplate(glyph) ? (((glyph)-GLYPH_MTEMPLATE_OFF) % NUMMONS) :			\
 	glyph_is_detected_monster(glyph) ? ((glyph)-GLYPH_DETECT_OFF) :	\
 	glyph_is_ridden_monster(glyph) ? ((glyph)-GLYPH_RIDDEN_OFF) :	\
 	NO_GLYPH)
@@ -416,7 +416,7 @@
 		(glyph_is_normal_monster(glyph)				\
 		|| glyph_is_pet(glyph)					\
 		|| glyph_is_peace(glyph)					\
-		|| glyph_is_zombie(glyph)					\
+		|| glyph_is_mtemplate(glyph)					\
 		|| glyph_is_ridden_monster(glyph)			\
 		|| glyph_is_detected_monster(glyph))
 #define glyph_is_normal_monster(glyph)					\
@@ -425,8 +425,8 @@
     ((glyph) >= GLYPH_PET_OFF && (glyph) < (GLYPH_PET_OFF+NUMMONS))
 #define glyph_is_peace(glyph)						\
     ((glyph) >= GLYPH_PEACE_OFF && (glyph) < (GLYPH_PEACE_OFF+NUMMONS))
-#define glyph_is_zombie(glyph)						\
-    ((glyph) >= GLYPH_ZOMBIE_OFF && (glyph) < (GLYPH_ZOMBIE_OFF+NUMMONS))
+#define glyph_is_mtemplate(glyph)						\
+    ((glyph) >= GLYPH_MTEMPLATE_OFF && (glyph) < (GLYPH_MTEMPLATE_OFF+NUMMONS*MAXTEMPLATE))
 #define glyph_is_body(glyph)						\
     ((glyph) >= GLYPH_BODY_OFF && (glyph) < (GLYPH_BODY_OFF+NUMMONS))
 #define glyph_is_ridden_monster(glyph)					\

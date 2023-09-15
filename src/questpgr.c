@@ -492,8 +492,9 @@ qt_montype()
 				else return &mons[PM_DEEPEST_ONE];
 			break;
 			case 6:
-				if(rn2(4)) return &mons[PM_PHANTASM];
-				else if(rn2(4)) return &mons[PM_NEVERWAS];
+				if(rn2(3)) return &mons[PM_PHANTASM];
+				else if(rn2(3)) return &mons[PM_NEVERWAS];
+				else if(rn2(3)) return &mons[PM_CARCOSAN_COURTIER];
 				else if(rn2(3)) return &mons[PM_INTONER];
 				else return &mons[PM_BLACK_FLOWER];
 			break;
@@ -550,6 +551,18 @@ qt_montype()
 		if (qpm != NON_PM && rn2(5) && !(mvitals[qpm].mvflags & G_GONE && !In_quest(&u.uz)))
 			return (&mons[qpm]);
 		return (mkclass(S_DEMON, G_HELL));
+	} else if(Role_if(PM_MADMAN) && (u.uz.dlevel >= qlocate_level.dlevel)){
+		int qpm;
+		if(rn2(5)){
+			qpm = PM_LARGE_CAT;
+			if (qpm != NON_PM && rn2(5) && !(mvitals[qpm].mvflags & G_GONE && !In_quest(&u.uz)))
+				return (&mons[qpm]);
+			return (mkclass(S_WORM, G_NOHELL));
+		}
+		qpm = PM_CONTAMINATED_PATIENT;
+		if (qpm != NON_PM && rn2(5) && !(mvitals[qpm].mvflags & G_GONE && !In_quest(&u.uz)))
+			return (&mons[qpm]);
+		return (mkclass(S_BAT, G_NOHELL|G_HELL));
 	} else if(Role_if(PM_MONK)){
 		int qpm;
 		int monks_of_kaen[] = {PM_XORN_MONK, PM_DAO_LAO_GUI_MONK, PM_ZHI_REN_MONK, PM_XUENU_MONK};
@@ -570,6 +583,43 @@ qt_montype()
 			return (&mons[qpm]);
 		//Should be impossible:
 		return (mkclass(S_YETI, G_NOHELL));
+	} else if(urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH){
+		int qpm;
+		int duergar[] = {PM_DUERGAR, PM_DUERGAR_STONEGUARD, PM_DUERGAR_DEBILITATOR};
+		int drow_etc[] = {PM_HOUSELESS_DROW, PM_HOUSELESS_DROW, PM_HOUSELESS_DROW, PM_HOUSELESS_DROW,
+					PM_SPROW, PM_SPROW, PM_DRIDER, PM_DROW_MUMMY,
+					PM_HEDROW_ZOMBIE, PM_DROW_CAPTAIN, PM_HEDROW_WARRIOR, PM_HEDROW_WIZARD,
+					PM_DROW_MATRON, PM_PEN_A_MENDICANT, PM_MENDICANT_SPROW, PM_MENDICANT_DRIDER,
+					PM_Y_CULTIST_MATRON, PM_Y_CULTIST_WIZARD, PM_Y_CULTIST_FIGHTER, PM_Y_CULTIST,
+					PM_Y_CULTIST_PATRON, PM_Y_CULTIST_WIZARD, PM_Y_CULTIST_FIGHTER, PM_Y_CULTIST,
+					PM_ALLIANCE_VANGUARD, PM_ANULO, PM_ANULO, PM_DWARF,
+					PM_DWARF, PM_WOODLAND_ELF, PM_WOODLAND_ELF, PM_GREEN_ELF,
+					PM_GREEN_ELF, PM_PEASANT, PM_PEASANT, PM_GOBLIN,
+					PM_HOBGOBLIN, PM_BUGBEAR, PM_BUGBEAR, PM_HOBBIT,
+					PM_GNOME, PM_GNOME, PM_HILL_GIANT, PM_HILL_GIANT,
+					PM_MINOTAUR, PM_MINOTAUR_PRIESTESS, PM_ETTIN,
+					PM_DEMINYMPH
+			};
+		if(!rn2(3)){
+			qpm = ROLL_FROM(duergar);
+			if (qpm != NON_PM && rn2(5) && !(mvitals[qpm].mvflags & G_GONE && !In_quest(&u.uz)))
+				return (&mons[qpm]);
+			return (mkclass(S_HUMANOID, G_NOHELL));
+		}
+		if(rn2(2)){
+			if(u.uevent.qcompleted)
+				qpm = rn2(5) ? ROLL_FROM(duergar) : rn2(3) ? PM_MIND_FLAYER : PM_MASTER_MIND_FLAYER;
+			else
+				qpm = rn2(5) ? PM_KUO_TOA : rn2(3) ? PM_KUO_TOA_WHIP : rn2(3) ? PM_CHUUL : PM_ELDER_CHUUL;
+			if (qpm != NON_PM && !(mvitals[qpm].mvflags & G_GONE && !In_quest(&u.uz)))
+				return (&mons[qpm]);
+			//Fall through in this (impossible?) case
+		}
+		qpm = ROLL_FROM(drow_etc);
+		if (qpm != NON_PM && !(mvitals[qpm].mvflags & G_GONE && !In_quest(&u.uz)))
+			return (&mons[qpm]);
+		//Should be impossible:
+		return (mkclass(S_HUMAN, G_NOHELL));
 	} else if(Role_if(PM_NOBLEMAN) && Race_if(PM_HALF_DRAGON) && flags.initgend
 		&& ((Is_qlocate(&u.uz) && rn2(2)) || (u.uz.dlevel < qlocate_level.dlevel))
 	){
@@ -1090,7 +1140,9 @@ neutral_montype()
 				if(chance < 30 && !toostrong(PM_CUPRILACH_RILMANI, diff))
 					return &mons[PM_CUPRILACH_RILMANI];
 				if(chance < 60 && !toostrong(PM_FERRUMACH_RILMANI, diff))
-					return &mons[PM_CUPRILACH_RILMANI];
+					return &mons[PM_FERRUMACH_RILMANI];
+				if(chance < 70)
+					return mkclass(S_GOLEM, G_NOHELL);
 				return &mons[PM_PLUMACH_RILMANI];
 			break;
 			case 2:
@@ -1105,6 +1157,8 @@ neutral_montype()
 				return &mons[PM_SHATTERED_ZIGGURAT_CULTIST];
 			break;
 			case 4:
+				if(on_level(&spire_level, &u.uz) && !rn2(4))
+					return mkclass(S_GOLEM, G_NOHELL);
 				return &mons[PM_PLAINS_CENTAUR];
 			break;
 		}
@@ -1119,7 +1173,9 @@ neutral_montype()
 		if(chance < 35 && !toostrong(PM_CUPRILACH_RILMANI, diff))
 			return &mons[PM_CUPRILACH_RILMANI];
 		if(chance < 65 && !toostrong(PM_FERRUMACH_RILMANI, diff))
-			return &mons[PM_CUPRILACH_RILMANI];
+			return &mons[PM_FERRUMACH_RILMANI];
+		if(chance < 75)
+			return mkclass(S_GOLEM, G_NOHELL);
 		return &mons[PM_PLUMACH_RILMANI];
 	}
 	if(on_level(&rlyeh_level,&u.uz)){

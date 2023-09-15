@@ -4,6 +4,7 @@
 
 #include "hack.h"
 #include "prop.h"
+#include "artifact.h"
 
 STATIC_DCL void FDECL(mkbox_cnts,(struct obj *));
 STATIC_DCL void FDECL(obj_timer_checks,(struct obj *, XCHAR_P, XCHAR_P, int));
@@ -156,6 +157,16 @@ static const struct icp elven_materials[] = {
 	{ 15, COPPER },
 	{  5, BONE },
 	{  5, GOLD }
+};
+
+/* for eilistran armor */
+static const struct icp eli_materials[] = {
+	{600, SILVER },
+	{300, PLATINUM },
+	{ 50, MITHRIL },
+	{ 25, GLASS },
+	{ 13, GEMSTONE },
+	{ 12, MINERAL }
 };
 
 /* for weapons of droven make -- armor is all shadowsteel */
@@ -616,7 +627,7 @@ int mkflags;
 	otmp->dknown = 0;
 	otmp->corpsenm = 0; /* BUGFIX: Where does this get set? shouldn't it be given a default during initialization? */
 	otmp->objsize = MZ_MEDIUM;
-	otmp->bodytypeflag = MB_HUMANOID;
+	otmp->bodytypeflag = 0;
 	otmp->ovar1 = 0;
 	otmp->oward = 0;
 	for(int i = 0; i < OPROP_LISTSIZE; i++)
@@ -636,7 +647,9 @@ int mkflags;
 	
 	set_object_color(otmp);
 	
-	if(otyp == VIPERWHIP) otmp->ovar1 = rn2(2) ? 1 : rn2(5) ? rnd(2) : rnd(5);
+	set_obj_shape(otmp, MB_HUMANOID);
+	
+	if(otyp == VIPERWHIP) otmp->ovar1_heads = rn2(2) ? 1 : rn2(5) ? rnd(2) : rnd(5);
 	
 	if (summon) {
 		/* set up otmp as summoned indefinitely
@@ -688,44 +701,44 @@ int mkflags;
 				add_oprop(otmp, OPROP_RAKUW);
 
 			if (is_vibroweapon(otmp)){
-				otmp->ovar1 = 80L + rnd(20);
+				otmp->ovar1_charges = 80L + rnd(20);
 			}
 			else if (otmp->otyp == RAYGUN){
-				otmp->ovar1 = (8 + rnd(8)) * 10L;
+				otmp->ovar1_charges = (8 + rnd(8)) * 10L;
 				otmp->altmode = AD_SLEE;
 			}
 			else if (otmp->otyp == MASS_SHADOW_PISTOL){
 				struct obj *stone = mksobj(ROCK, NO_MKOBJ_FLAGS);
-				otmp->ovar1 = 800L + rnd(200);
+				otmp->ovar1_charges = 800L + rnd(200);
 				stone->quan = 1;
 				stone->owt = weight(stone);
 				add_to_container(otmp, stone);
 				container_weight(otmp);
 			}
 			else if (is_blaster(otmp)){ //Rayguns and mass-shadow pistols are also blasters, so this has to go under that case
-				otmp->ovar1 = 80L + rnd(20);
+				otmp->ovar1_charges = 80L + rnd(20);
 				if (otmp->otyp == ARM_BLASTER) otmp->altmode = WP_MODE_SINGLE;
 				if (otmp->otyp == RAYGUN) otmp->altmode = AD_FIRE;	// I think this is never reached?
 			}
 			else if (otmp->otyp == MOON_AXE){
 				switch (phase_of_the_moon()){
 				case 0:
-					otmp->ovar1 = ECLIPSE_MOON;
+					otmp->ovar1_moonPhase = ECLIPSE_MOON;
 					break;
 				case 1:
 				case 7:
-					otmp->ovar1 = CRESCENT_MOON;
+					otmp->ovar1_moonPhase = CRESCENT_MOON;
 					break;
 				case 2:
 				case 6:
-					otmp->ovar1 = HALF_MOON;
+					otmp->ovar1_moonPhase = HALF_MOON;
 					break;
 				case 3:
 				case 5:
-					otmp->ovar1 = GIBBOUS_MOON;
+					otmp->ovar1_moonPhase = GIBBOUS_MOON;
 					break;
 				case 4:
-					otmp->ovar1 = FULL_MOON;
+					otmp->ovar1_moonPhase = FULL_MOON;
 					break;
 				}
 			}
@@ -863,7 +876,7 @@ int mkflags;
 				blessorcurse(otmp, 2);
 				break;
 			case SEISMIC_HAMMER:
-				otmp->ovar1 = 80L + rnd(20);
+				otmp->ovar1_charges = 80L + rnd(20);
 				break;
 			case DOUBLE_LIGHTSABER:
 			case LIGHTSABER:
@@ -881,9 +894,9 @@ int mkflags;
 					container_weight(otmp);
 				}
 				if(otmp->otyp == LIGHTSABER)
-					otmp->ovar1 = random_saber_hilt();
+					otmp->ovar1_lightsaberHandle = random_saber_hilt();
 				else if(otmp->otyp == BEAMSWORD)
-					otmp->ovar1 = random_beam_hilt();
+					otmp->ovar1_lightsaberHandle = random_beam_hilt();
 				break;
 			case CHEST:
 			case BOX:
@@ -980,8 +993,7 @@ int mkflags;
 										  pick = POT_AMNESIA;
 										  break;
 									  }
-									  // otmp->ovar1 = (long)(rn2(POT_POLYMORPH - POT_GAIN_ABILITY + 1) + POT_GAIN_ABILITY);
-									  otmp->ovar1 = (long)(pick);
+									  otmp->ovar1_ampule = (long)(pick);
 									  otmp->spe = rn1(6, 6);
 			}break;
 			case HORN_OF_PLENTY:
@@ -1029,6 +1041,8 @@ int mkflags;
 				struct obj * otmp2;
 				struct obj * oinv;
 				int skull;
+				int template = 0;
+				int extra_flags = 0;
 				if(Infuture){
 					if(Race_if(PM_ANDROID)){
 						int skulls[] = {PM_DWARF_KING, PM_DWARF_QUEEN, PM_GITHYANKI_PIRATE, PM_DEMINYMPH, PM_MORDOR_MARSHAL, PM_MOUNTAIN_CENTAUR, PM_DRIDER, 
@@ -1037,7 +1051,7 @@ int mkflags;
 							PM_EMBRACED_DROWESS, PM_EMBRACED_DROWESS, PM_NURSE, 
 							
 							PM_GYNOID, PM_GYNOID, PM_GYNOID, PM_OPERATOR, PM_GYNOID, PM_GYNOID, PM_GYNOID, PM_OPERATOR, PM_ANDROID,
-							PM_MYRKALFAR_WARRIOR, PM_MYRKALFAR_WARRIOR, PM_DWARF, PM_DWARF, PM_HUMAN, PM_HUMAN, 
+							PM_MYRKALFAR_WARRIOR, PM_MYRKALFAR_WARRIOR, PM_DWARF_WARRIOR, PM_DWARF_WARRIOR, PM_HUMAN, PM_HUMAN, 
 							PM_INCANTIFIER, PM_INCANTIFIER 
 						};
 						skull = ROLL_FROM(skulls);
@@ -1049,31 +1063,50 @@ int mkflags;
 							PM_EMBRACED_DROWESS, PM_EMBRACED_DROWESS, 
 							
 							PM_MYRKALFR, PM_MYRKALFR, PM_ELF, PM_ELF, 
-							PM_MYRKALFAR_WARRIOR, PM_MYRKALFAR_WARRIOR, PM_DWARF, PM_DWARF, PM_HUMAN, PM_HUMAN, 
+							PM_MYRKALFAR_WARRIOR, PM_MYRKALFAR_WARRIOR, PM_DWARF_WARRIOR, PM_DWARF_WARRIOR, PM_HUMAN, PM_HUMAN, 
 							PM_INCANTIFIER, PM_INCANTIFIER 
 						};
 						skull = ROLL_FROM(skulls);
 					}
 				}
+				// else if(In_quest(&u.uz) && Role_if(PM_HEALER) && urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH && mvitals[PM_BLIBDOOLPOOLP_S_MINDGRAVEN_CHAMPION].born == 0){
+				else if(In_quest(&u.uz) && Is_nemesis(&u.uz) && Role_if(PM_HEALER) && urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH && mvitals[PM_BLIBDOOLPOOLP_S_MINDGRAVEN_CHAMPION].born == 0){
+					skull = PM_BLIBDOOLPOOLP_S_MINDGRAVEN_CHAMPION;
+					mvitals[PM_BLIBDOOLPOOLP_S_MINDGRAVEN_CHAMPION].born = 1;
+				}
+				else if(Role_if(PM_MADMAN) && Race_if(PM_GNOME) && on_level(&u.uz, &nemesis_level) && in_mklev){
+					skull = PM_COURE_ELADRIN;
+					template = PSEUDONATURAL;
+					extra_flags = NO_MINVENT;
+				}
 				else {
 					int skulls[] = {PM_DWARF_KING, PM_DWARF_QUEEN, PM_MAID, 
-						PM_GITHYANKI_PIRATE, PM_DEMINYMPH, PM_MORDOR_ORC_ELITE, PM_MORDOR_MARSHAL,
+						PM_DUERGAR_DEEPKING,
+						PM_GITHYANKI_PIRATE, PM_GITHYANKI_PIRATE,
+						PM_DEMINYMPH, 
+						PM_MORDOR_ORC_ELITE, PM_MORDOR_MARSHAL, PM_ANGBAND_ORC, PM_ORC_OF_THE_AGES_OF_STARS,
 						PM_MOUNTAIN_CENTAUR, PM_DRIDER, 
 						PM_DROW_CAPTAIN, PM_HEDROW_WIZARD, PM_DROW_MATRON, PM_HEDROW_BLADEMASTER, 
 						PM_DROW_CAPTAIN, PM_HEDROW_WARRIOR, PM_DROW_MATRON, PM_DROW_ALIENIST, 
+						PM_ANULO, PM_ANULO_DANCER,
 						PM_ELF_LORD, PM_ELF_LADY, PM_ELVENKING, PM_ELVENQUEEN, 
+						PM_STAR_ELF, PM_STAR_ELF, PM_STAR_EMPEROR, PM_STAR_EMPRESS,
 						PM_ARCHEOLOGIST, PM_BARBARIAN, PM_HALF_DRAGON, PM_CAVEMAN, PM_CAVEWOMAN, 
 						PM_KNIGHT, PM_KNIGHT, PM_MADMAN, PM_MADWOMAN, PM_PRIEST, PM_PRIESTESS,
 						PM_RANGER, PM_ROGUE, PM_ROGUE, PM_SAMURAI, PM_VALKYRIE, PM_WIZARD 
 					};
 					skull = ROLL_FROM(skulls);
 				}
-				mon = makemon(&mons[skull], 0, 0, MM_ADJACENTOK|MM_NOCOUNTBIRTH);
+				mon = makemon(&mons[skull], 0, 0, MM_ADJACENTOK|MM_NOCOUNTBIRTH|extra_flags);
 				if(mon){
+					if(template)
+						set_template(mon, template);
 					if(mon->m_lev < 10){
 						mon->m_lev = 10;
 						mon->mhp = mon->mhpmax = d(10, 8);
 					}
+					if(quest_faction(mon))
+						set_faction(mon, 0);
 					for(oinv = mon->minvent; oinv; oinv = mon->minvent){
 						mon->misc_worn_check &= ~oinv->owornmask;
 						update_mon_intrinsics(mon, oinv, FALSE, FALSE);
@@ -1125,7 +1158,7 @@ int mkflags;
 				doMaskStats(otmp);
 				break;
 			case DOLL_S_TEAR:
-				otmp->ovar1 = init_doll_sales();
+				otmp->ovar1_dollTypes = init_doll_sales();
 				otmp->spe = rnd(20);
 				break;
 			}
@@ -1154,12 +1187,23 @@ int mkflags;
 			if(otmp->otyp == BROKEN_ANDROID || otmp->otyp == BROKEN_GYNOID || otmp->otyp == LIFELESS_DOLL){
 				struct monst * mon;
 				struct obj * otmp2;
-				mon = makemon(&mons[otmp->corpsenm], 0, 0, MM_ADJACENTOK|NO_MINVENT|MM_NOCOUNTBIRTH);
+				int tame = 0;
+				if(Role_if(PM_MADMAN) && on_level(&u.uz, &nemesis_level) && in_mklev){
+					tame = MM_EDOG;
+				}
+				mon = makemon(&mons[otmp->corpsenm], 0, 0, MM_ADJACENTOK|NO_MINVENT|MM_NOCOUNTBIRTH|tame);
 				if(mon){
+					if(tame){
+						initedog(mon);
+						EDOG(mon)->loyal = TRUE;
+					}
 					otmp2 = save_mtraits(otmp, mon);
-					mongone(mon);
 					if(otmp2)
 						otmp = otmp2;
+					if(mon->m_insight_level){
+						otmp->ovar1_insightlevel = mon->m_insight_level;
+					}
+					mongone(mon);
 				}
 			}
 			break;
@@ -1361,6 +1405,14 @@ int mkflags;
 				otmp->age = (long)rn1(900, 900);//Last longer than dwarvish helms, since the radius is smaller
 				otmp->lamplit = 0;
 			}
+			if (otmp->otyp == LANTERN_PLATE_MAIL) {
+				otmp->age = (long)rn1(500, 1000);
+				otmp->lamplit = 0;
+			}
+			if (otmp->otyp == EILISTRAN_ARMOR) {
+				otmp->altmode = EIL_MODE_ON;
+				otmp->ovar1_eilistran_charges = 600;
+			}
 			if (is_readable_armor_otyp(otmp->otyp)){
 				otmp->ohaluengr = TRUE;
 				if (Race_if(PM_DROW) && Is_qstart(&u.uz)) otmp->oward = u.start_house;
@@ -1371,9 +1423,10 @@ int mkflags;
 
 			break;
 		case WAND_CLASS:
-			if (otmp->otyp == WAN_WISHING) otmp->spe = rnd(3); else
-				otmp->spe = rn1(5,
-				(objects[otmp->otyp].oc_dir == NODIR) ? 11 : 4);
+			if (otmp->otyp == WAN_WISHING)
+				otmp->spe = rnd(3);
+			else
+				otmp->spe = rn1(5, (objects[otmp->otyp].oc_dir == NODIR) ? 11 : 4);
 			blessorcurse(otmp, 17);
 			if (otmp->otyp == WAN_WISHING)
 				otmp->recharged = 1;
@@ -1480,8 +1533,12 @@ int mkflags;
 				otmp->owt = weight(otmp);
 			}
 			break;
-		case COIN_CLASS:
 		case BED_CLASS:
+			if(otmp->otyp == BERGONIC_CHAIR){
+				otmp->spe = d(3,3);
+			}
+			break;
+		case COIN_CLASS:
 		case TILE_CLASS:
 		case SCOIN_CLASS:
 			break;	/* do nothing */
@@ -1502,12 +1559,7 @@ int mkflags;
 		if (quest_equipment(otmp) && !otmp->oartifact) {
 			otmp->objsize = (&mons[urace.malenum])->msize;
 			if (otmp->oclass == ARMOR_CLASS){
-				if (is_suit(otmp) || otmp->otyp == BODYGLOVE) 
-					otmp->bodytypeflag = ((&mons[urace.malenum])->mflagsb&MB_BODYTYPEMASK);
-				else if (is_helmet(otmp)) 
-					otmp->bodytypeflag = ((&mons[urace.malenum])->mflagsb&MB_HEADMODIMASK);
-				else if (is_shirt(otmp)) 
-					otmp->bodytypeflag = ((&mons[urace.malenum])->mflagsb&MB_HUMANOID) ? MB_HUMANOID : ((&mons[urace.malenum])->mflagsb&MB_BODYTYPEMASK);
+				set_obj_shape(otmp, mons[urace.malenum].mflagsb);
 			}
 		}
 	}
@@ -1540,6 +1592,47 @@ int mkflags;
 	
 	otmp->owt = weight(otmp);
 	return(otmp);
+}
+
+void
+size_and_shape_to_fit(obj, mon)
+struct obj *obj;
+struct monst *mon;
+{
+	struct permonst *ptr = mon->data;
+	if (Is_dragon_scales(obj)){
+		//Fits everything
+		return;
+	}
+	// change shape
+	if (is_shirt(obj) || obj->otyp == ELVEN_TOGA){
+		//Check that the monster can actually have armor that fits it.
+		if(!(ptr->mflagsb&MB_BODYTYPEMASK)){
+			return;
+		}
+		set_obj_shape(obj, ptr->mflagsb);
+	}
+	else if (is_suit(obj)){
+		//Check that the monster can actually have armor that fits it.
+		if(!(ptr->mflagsb&MB_BODYTYPEMASK)){
+			return;
+		}
+		set_obj_shape(obj, ptr->mflagsb);
+	}
+	else if (is_helmet(obj) && !is_hat(obj)){
+		//Check that the monster can actually have armor that fits it.
+		if(!has_head(ptr) || nohat(ptr)){
+			return;
+		}
+		set_obj_shape(obj, ptr->mflagsb);
+	}
+	
+	// change size (AFTER shape, because this may be aborted during that step.
+	obj->objsize = ptr->msize;
+	if(ptr->mtyp == PM_BLIBDOOLPOOLP_S_MINDGRAVEN_CHAMPION && is_boots(obj))
+		obj->objsize++;
+	
+	fix_object(obj);
 }
 
 void
@@ -1682,7 +1775,7 @@ start_corpse_timeout(body)
 	if (action == ROT_CORPSE && !acidic(&mons[body->corpsenm])){
 		/* Corpses get moldy
 		 */
-		chance = (Is_zuggtmoy_level(&u.uz) && flags.spore_level) ? FULL_MOLDY_CHANCE : 
+		chance = ((Is_zuggtmoy_level(&u.uz) && flags.spore_level) || (attchmon && attchmon->brainblooms)) ? FULL_MOLDY_CHANCE : 
 				 (Is_zuggtmoy_level(&u.uz) || flags.spore_level) ? HALF_MOLDY_CHANCE : 
 				 BASE_MOLDY_CHANCE;
 		for (age = TAINT_AGE + 1; age <= ROT_AGE; age++)
@@ -1704,7 +1797,7 @@ start_corpse_timeout(body)
 			}
 	}
 	chance = (flags.walky_level) ? TROLL_REVIVE_CHANCE : 
-			 (attchmon && attchmon->zombify) ? FULL_MOLDY_CHANCE : 
+			 (attchmon && (attchmon->zombify || attchmon->mspores)) ? FULL_MOLDY_CHANCE : 
 			 (Is_night_level(&u.uz)) ? HALF_MOLDY_CHANCE : 
 			 0;
 	if(action == ROT_CORPSE && chance){
@@ -1986,6 +2079,10 @@ struct obj* obj;
 	case BROKEN_ANDROID:
 	case BROKEN_GYNOID:
 	case WRITING_DESK:
+	case BLASTER_BOLT:
+	case HEAVY_BLASTER_BOLT:
+	case LASER_BEAM:
+	case CARCOSAN_BOLT:
 		return NULL;
 		/* Any other cases for specific object types go here. */
 	case SARCOPHAGUS:
@@ -2021,6 +2118,8 @@ struct obj* obj;
 	case FROST_HORN:
 	case HORN_OF_PLENTY:
 		return horn_materials;
+	case EILISTRAN_ARMOR:
+		return eli_materials;
 	default:
 		break;
 	}
@@ -2125,13 +2224,16 @@ int oldmat, newmat;
 		stop_timer(LIGHT_DAMAGE, obj->timed);
 	}
 	/* set random gemstone type for valid gemstone objects */
-	if (!obj->ovar1 && newmat == GEMSTONE && oldmat != GEMSTONE && obj->oclass != GEM_CLASS && !obj_type_uses_ovar1(obj) && !obj_art_uses_ovar1(obj)) {
-		do{
-			obj->ovar1 = MAGICITE_CRYSTAL + rn2(LAST_GEM - MAGICITE_CRYSTAL + 1);
-		} while (obj->ovar1 == OBSIDIAN);
+	if (newmat == GEMSTONE && obj->oclass != GEM_CLASS && (obj->sub_material < MAGICITE_CRYSTAL || obj->sub_material > LAST_GEM || oldmat != GEMSTONE)) {
+		if(obj->oartifact == ART_JIN_GANG_ZUO){
+			set_submat(obj, DIAMOND);
+		}
+		else do{
+			set_submat(obj, MAGICITE_CRYSTAL + rn2(LAST_GEM - MAGICITE_CRYSTAL + 1));
+		} while (obj->sub_material == OBSIDIAN);
 	}
-	else if (oldmat == GEMSTONE && newmat != GEMSTONE && obj->oclass != GEM_CLASS && !obj_type_uses_ovar1(obj) && !obj_art_uses_ovar1(obj)) {
-		obj->ovar1 = 0;	/* and reset if changing away from gemstone*/
+	else if (oldmat == GEMSTONE && newmat != GEMSTONE && obj->oclass != GEM_CLASS) {
+		set_submat(obj, 0);	/* and reset if changing away from gemstone*/
 	}
 }
 
@@ -2213,6 +2315,11 @@ int mat;
 	
 	obj->obj_material = mat; //Set material
 	
+	if(obj->oeroded && !is_rustprone(obj) && !is_flammable(obj) && !is_evaporable(obj))
+		obj->oeroded = 0;
+	if(obj->oeroded2 && !is_rottable(obj) && !is_corrodeable(obj))
+		obj->oeroded2 = 0;
+	
 	/* cover special properties of materials like shadowsteel timer and gemstone type */
 	handle_material_specials(obj, oldmat, obj->obj_material);
 
@@ -2279,7 +2386,6 @@ int mat;
 		case LEATHER_HELM:
 		case ARCHAIC_HELM:
 		case DROVEN_HELM:
-		case HARMONIUM_HELM:			/* irreversible, metal */
 //		case PLASTEEL_HELM:				/* has a unique function of shape -- needs a generic version? */
 //		case CRYSTAL_HELM:				/* has a unique function of shape -- needs a generic version? */
 			if (mat == LEATHER)			obj->otyp = LEATHER_HELM;
@@ -2299,7 +2405,6 @@ int mat;
 		case GAUNTLETS:
 		case ARCHAIC_GAUNTLETS:
 		case PLASTEEL_GAUNTLETS:		/* irreversible, plastic */
-		case HARMONIUM_GAUNTLETS:		/* irreversible, metal */
 		case ORIHALCYON_GAUNTLETS:		/* irreversible, metal */
 			if		(mat == DRAGON_HIDE)obj->otyp = (is_hard(obj) ? GAUNTLETS : GLOVES);
 			else if	(mat == LEATHER
@@ -2320,13 +2425,16 @@ int mat;
 		case ARCHAIC_BOOTS:
 		case HIGH_BOOTS:
 		case PLASTEEL_BOOTS:			/* irreversible, plastic */
-		case HARMONIUM_BOOTS:			/* irreversible, metal */
-			if		(mat == DRAGON_HIDE)obj->otyp = (is_hard(obj) ? ARMORED_BOOTS : HIGH_BOOTS);
-			else if	(mat >= WOOD){		
-				if(obj->otyp != ARMORED_BOOTS && 
-					obj->otyp != ARCHAIC_BOOTS
-				) obj->otyp = ARMORED_BOOTS;
-			} else						obj->otyp = HIGH_BOOTS;
+			if(mat == DRAGON_HIDE)
+				obj->otyp = (is_hard(obj) ? ARMORED_BOOTS : HIGH_BOOTS);
+			else if(hard_mat(mat) != is_hard(obj)){
+				if(hard_mat(mat)){
+					if(obj->otyp != ARMORED_BOOTS && 
+						obj->otyp != ARCHAIC_BOOTS
+					) obj->otyp = ARMORED_BOOTS;
+				} else
+					obj->otyp = HIGH_BOOTS;
+			}
 		break;
 		/* shoes */
 		case SHOES:
@@ -2358,7 +2466,6 @@ int mat;
 //			else;
 //				// fall through
 		case SCALE_MAIL:
-		case HARMONIUM_SCALE_MAIL:		/* irreversible, metal */
 		case STUDDED_LEATHER_ARMOR:		/* irreversible, leather */
 		case LEATHER_ARMOR:				/* irreversible, leather */
 			obj->otyp = SCALE_MAIL;
@@ -2372,7 +2479,6 @@ int mat;
 		case PLATE_MAIL:
 		case PLASTEEL_ARMOR:			/* irreversible, plastic */
 		case DROVEN_PLATE_MAIL:			/* irreversible, shadowsteel */
-		case HARMONIUM_PLATE:			/* irreversible, metal */
 			obj->otyp = PLATE_MAIL;
 		break;
 		/* long swords */
@@ -2418,7 +2524,7 @@ int mat;
 		// case CHAIN:
 			// obj->otyp = ;
 		// break;
-		// case IRON_BANDS:
+		// case BANDS:
 			// obj->otyp = ;
 		// break;
 	}
@@ -2515,17 +2621,20 @@ weight(obj)
 register struct obj *obj;
 {
 	int wt = objects[obj->otyp].oc_weight;
-	if (obj->otyp == MAGIC_CHEST && obj->obolted) wt = 99999;	/* impossibly heavy */
+	int base_mat = (obj->oartifact && artilist[obj->oartifact].material != MT_DEFAULT && artilist[obj->oartifact].weight != WT_DEFAULT) ? artilist[obj->oartifact].material : objects[obj->otyp].oc_material;
+
+	if (obj->otyp == MAGIC_CHEST && obj->obolted) return 99999;	/* impossibly heavy */
 
 	if (obj->oartifact)
 		wt = artifact_weight(obj);
-	else if(obj->obj_material != objects[obj->otyp].oc_material) {
+
+	if(obj->obj_material != base_mat) {
 		/* do not apply this to artifacts; those are handled in artifact_weight() */
-		wt = wt * materials[obj->obj_material].density / materials[objects[obj->otyp].oc_material].density;
+		wt = wt * materials[obj->obj_material].density / materials[base_mat].density;
 	}
 	
 	if(obj->otyp == MOON_AXE && obj->oartifact != ART_SCEPTRE_OF_LOLTH){
-		if(obj->ovar1) wt =  wt/4*obj->ovar1;
+		if(obj->ovar1_moonPhase) wt =  wt/4*obj->ovar1_moonPhase;
 		else wt = wt/4;
 	}
 
@@ -2550,6 +2659,11 @@ register struct obj *obj;
 			wt += mons[PM_VAMPIRE].cwt;
 		}else if(obj->spe == 5){
 			wt += mons[PM_NITOCRIS].cwt;
+		}else if(obj->spe == 9){
+			if(urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH)
+				wt += mons[PM_PRIESTESS_OF_GHAUNADAUR].cwt;
+			else
+				wt += mons[PM_VAMPIRE_LADY].cwt;
 		}
 	}
 	if ((Is_container(obj) && obj->otyp != MAGIC_CHEST) || obj->otyp == STATUE) {
@@ -2914,7 +3028,19 @@ register struct obj *otmp;
 	int otyp = otmp->otyp;
 	int omat = otmp->obj_material;
 
-	if (item_has_property(otmp, FIRE_RES) || otyp == WAN_FIRE)
+	/* Candles can be burned, but they're not flammable in the sense that
+	 * they can't get fire damage and it makes no sense for them to be
+	 * fireproofed.
+	 */
+	if (Is_candle(otmp))
+		return FALSE;
+
+	if (item_has_property(otmp, FIRE_RES) || otyp == WAN_FIRE
+	 || otyp == SCR_FIRE || otyp == SCR_RESISTANCE || otyp == SPE_FIREBALL || otyp == FIRE_HORN
+	)
+		return FALSE;
+
+	if (otyp == SPE_BOOK_OF_THE_DEAD)
 		return FALSE;
 
 	return((boolean)((omat <= CHITIN && omat != LIQUID) || omat == PLASTIC));
@@ -2944,7 +3070,7 @@ place_object(otmp, x, y)
 register struct obj *otmp;
 int x, y;
 {
-    register struct obj *otmp2 = level.objects[x][y];
+    register struct obj *otmp2;
 
     if (otmp->where != OBJ_FREE)
 	panic("place_object: obj not free");
@@ -2952,13 +3078,14 @@ int x, y;
     obj_no_longer_held(otmp);
     if (is_boulder(otmp)) block_point(x,y);	/* vision */
 
+	otmp2 = level.objects[x][y];//Special effects of obj_no_longer_held may change level.objects[x][y]
     /* obj goes under boulders */
     if (otmp2 && is_boulder(otmp2)) {
-	otmp->nexthere = otmp2->nexthere;
-	otmp2->nexthere = otmp;
+		otmp->nexthere = otmp2->nexthere;
+		otmp2->nexthere = otmp;
     } else {
-	otmp->nexthere = otmp2;
-	level.objects[x][y] = otmp;
+		otmp->nexthere = otmp2;
+		level.objects[x][y] = otmp;
     }
 
     /* set the new object's location */
@@ -3413,10 +3540,15 @@ maid_clean(mon, obj)
 		if(canseemon(mon)) pline("The maid sticks an ofuda to the offending object.");
 		obj->cursed = 0;
 	}
-	if(obj->otyp == DWARVISH_HELM || obj->otyp == OIL_LAMP || obj->otyp == LANTERN){
+	if(obj->otyp == DWARVISH_HELM || obj->otyp == OIL_LAMP || obj->otyp == LANTERN || obj->otyp == LANTERN_PLATE_MAIL){
 		if(obj->age < 750){
 			obj->age += 750;
-			if(canseemon(mon)) pline("The maid adds some oil.");
+			if(canseemon(mon)) {
+				if(obj->otyp == OIL_LAMP)
+					pline("The maid adds some oil.");
+				else if(obj->otyp == LANTERN_PLATE_MAIL)
+					pline("The maid changes the batteries.");
+			}
 		}
 	}
 #ifdef TOURIST
@@ -3436,7 +3568,8 @@ maid_clean(mon, obj)
  * The input obj may be deleted in the process.
  * Based on the implementation of add_to_container.
  */
-struct obj *add_to_magic_chest(struct obj *obj,int key)
+struct obj *
+add_to_magic_chest(struct obj *obj,int key)
 {
     struct obj *otmp;
 
@@ -3477,6 +3610,7 @@ add_to_container(container, obj)
     obj->ocontainer = container;
     obj->nobj = container->cobj;
     container->cobj = obj;
+	container->owt = weight(container);
     return (obj);
 }
 

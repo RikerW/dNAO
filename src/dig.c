@@ -85,6 +85,11 @@ mkcavepos(x, y, dist, waslit, rockit)
     if(Blind)
 	feel_location(x, y);
     else newsym(x,y);
+
+	if (rockit)
+		block_point(x, y);
+	else
+		unblock_point(x, y);
 }
 
 STATIC_OVL void
@@ -141,7 +146,7 @@ xchar x, y;
 {
 	boolean ispick = is_pick(otmp),
 		is_saber = is_lightsaber(otmp),
-		is_seismic = (otmp->otyp == SEISMIC_HAMMER && otmp->ovar1 > 0),
+		is_seismic = (otmp->otyp == SEISMIC_HAMMER && otmp->ovar1_charges > 0),
 		is_axe = is_axe(otmp);
 
 	return ((ispick||is_saber||is_seismic) && sobj_at(STATUE, x, y) ? DIGTYP_STATUE :
@@ -314,6 +319,10 @@ dig()
 
 	bonus = 10 + rn2(5) + abon() +
 			   digitem->spe - greatest_erosion(digitem) + u.udaminc + aeshbon();
+
+	if(uarmg && uarmg->otyp == IMPERIAL_ELVEN_GAUNTLETS && check_imp_mod(uarmg, IEA_INC_DAM))
+		bonus += uarmg->spe;
+
 	if (Race_if(PM_DWARF))
 	    bonus *= 2;
 	if (digitem->oartifact == ART_GREAT_CLAWS_OF_URDLEN)
@@ -322,7 +331,7 @@ dig()
 	    bonus *= 2;
 	if (is_lightsaber(digitem) && !IS_TREES(lev->typ))
 	    bonus -= 11; /* Melting a hole takes longer */
-	if ((digitem->otyp == SEISMIC_HAMMER) && digitem->ovar1-- > 0)
+	if ((digitem->otyp == SEISMIC_HAMMER) && digitem->ovar1_charges-- > 0)
 	    bonus += 1000; /* Smashes through */
 
 	digging.effort += bonus;
@@ -657,6 +666,9 @@ boolean msgs;
 	    SET_FOUNTAIN_WARNED(x,y);		/* force dryup */
 	    dryup(x, y, madeby_u);
 		if(!flags.mon_moving && u.sealsActive&SEAL_EDEN) unbind(SEAL_EDEN,TRUE);
+	    return;
+	} else if (IS_FORGE(lev->typ)) {
+	    breakforge(x, y);
 	    return;
 #ifdef SINKS
 	} else if (IS_SINK(lev->typ)) {
@@ -1126,7 +1138,7 @@ openfakedoor()
 	Sprintf(msgbuf, "The hole in the %s above you closes up.",
 		ceiling(u.ux,u.uy));
 	schedule_goto(&dtmp, FALSE, TRUE, 0,
-			  (char *)0, !Blind ? msgbuf : (char *)0);
+			  (char *)0, !Blind ? msgbuf : (char *)0, 0, 0);
 }
 
 /* return TRUE if digging succeeded, FALSE otherwise */
@@ -1237,6 +1249,14 @@ boolean pit_only;
 		return TRUE;
 
 	} else if (IS_FOUNTAIN(lev->typ)) {
+		if(!pit_only){
+			openfakedoor();
+			return TRUE;
+		} else {
+			pline_The("%s here refuses to open.", surface(u.ux,u.uy));
+			return FALSE;
+		}
+	} else if (IS_FORGE(lev->typ)) {
 		if(!pit_only){
 			openfakedoor();
 			return TRUE;
@@ -1459,6 +1479,9 @@ openrocktrap()
 		fakerocktrap();
 	    return TRUE;
 	} else if (IS_FOUNTAIN(lev->typ)) {
+		fakerocktrap();
+	    return TRUE;
+	} else if (IS_FORGE(lev->typ)) {
 		fakerocktrap();
 	    return TRUE;
 #ifdef SINKS
@@ -2128,7 +2151,7 @@ watch_dig(mtmp, x, y, zap)
 
 	if (in_town(x, y) &&
 	    (closed_door(x, y) || lev->typ == SDOOR ||
-	     IS_WALL(lev->typ) || IS_FOUNTAIN(lev->typ) || IS_TREE(lev->typ))) {
+	     IS_WALL(lev->typ) || IS_FOUNTAIN(lev->typ) || IS_FORGE(lev->typ) || IS_TREE(lev->typ))) {
 	    if (!mtmp) {
 		for(mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
 		    if (DEADMONSTER(mtmp)) continue;
@@ -2284,13 +2307,17 @@ int oldy;
 	/* fill in around prev position */
 	for (tx = max(0, oldx-1); tx < min(COLNO, oldx+1); tx++)
 	for (ty = max(0, oldy-1); ty < min(ROWNO, oldy+1); ty++)
-		if (levl[tx][ty].typ == CORR)
+		if (levl[tx][ty].typ == CORR) {
 			levl[tx][ty].typ = STONE;
+			block_point(tx, ty);
+		}
 	/* dig out around new position */
 	for (tx = max(0, mtmp->mx-1); tx < min(COLNO, mtmp->mx+1); tx++)
 	for (ty = max(0, mtmp->my-1); ty < min(ROWNO, mtmp->my+1); ty++)
-		if (levl[tx][ty].typ == STONE && may_dig(tx, ty))
+		if (levl[tx][ty].typ == STONE && may_dig(tx, ty)) {
 			levl[tx][ty].typ = CORR;
+			unblock_point(tx, ty);
+		}
 }
 
 #endif /* OVL0 */
@@ -2607,6 +2634,12 @@ long timeout;	/* unused */
 		if (u.shubbie_atten) {
 			u.shubbie_credit += 30;
 			u.shubbie_devotion += 30;
+		}
+	}
+	if(obj->otyp == BRAINROOT){
+		struct monst *mon = makemon(&mons[PM_BRAINBLOSSOM_PATCH], obj->ox, obj->oy, MM_NOCOUNTBIRTH);
+		if(mon && canspotmon(mon)){
+			pline("%s grows back from the roots!", Monnam(mon));
 		}
 	}
 	obj_extract_self(obj);

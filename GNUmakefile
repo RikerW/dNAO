@@ -56,7 +56,7 @@ SRCOBJ = allmain.o alloc.o apply.o artifact.o astar.o attrib.o ball.o bones.o	\
          light.o lock.o mail.o makemon.o mapglyph.o mcastu.o 		\
          mextra.o minion.o mklev.o mkmap.o mkmaze.o mkobj.o mkroom.o	\
          mon.o mondata.o monmove.o monst.o monstr.o mplayer.o		\
-         mthrowu.o muse.o music.o o_init.o objects.o objnam.o		\
+         mthrowu.o muse.o music.o mutations.o o_init.o objects.o objnam.o		\
          oextra.o options.o pager.o pickup.o pline.o polyself.o potion.o	\
          pray.o priest.o projectile.o quest.o questpgr.o read.o 	\
          recover.o rect.o region.o restore.o rip.o rnd.o role.o 	\
@@ -191,7 +191,7 @@ $(AUTO_C:%.c=%.d): ;
 ##### DATA FILES #####
 
 QUEST_DES = Arch.des Anachrononaut.des Android.des Barb.des Bard.des Binder.des Caveman.des 	\
-            Convict.des Drow.des DrowNoble.des Elf.des Erebor.des GnomeRanger.des	\
+            Convict.des Drow.des DrowNoble.des DrowHealer.des Elf.des Erebor.des GnomeRanger.des	\
             HalfDragonFemaleNoble.des Healer.des Hedrow.des HedrowNoble.des Knight.des \
 			Monk.des Moria.des Madman.des Noble.des Pirate.des Priest.des Ranger.des Rogue.des	\
             Samurai.des Tourist.des Valkyrie.des Wizard.des

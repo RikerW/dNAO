@@ -2,7 +2,9 @@
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /* NetHack may be freely redistributed.  See license for details. */
 
+#include <math.h>
 #include "hack.h"
+#include "xhity.h"
 
 #ifdef OVL1
 #endif /*OVL1*/
@@ -1036,6 +1038,32 @@ domove()
 	    return;
 	}
 	
+	if(u.uentangled_oid){
+		//Any movement attempt (whether true move or bump attack) tries to break the entangling item.
+		if(!ubreak_entanglement()){
+			if(u.uentangled_otyp == RAZOR_WIRE){
+				int dmg = d(1,6);
+				int beat;
+				if(hates_silver(youracedata) && entangle_material(&youmonst, SILVER))
+					dmg += rnd(20);
+				if(hates_iron(youracedata) && (entangle_material(&youmonst, IRON) || entangle_material(&youmonst, GREEN_STEEL)))
+					dmg += rnd(u.ulevel);
+				if(hates_unholy(youracedata) && entangle_material(&youmonst, GREEN_STEEL))
+					dmg += d(2,9);
+				beat = entangle_beatitude(&youmonst, -1);
+				if(hates_unholy(youracedata) && beat)
+					dmg += beat == 2 ? d(2,9) : rnd(9);
+				beat = entangle_beatitude(&youmonst, 0);
+				if(hates_unblessed(youracedata) && beat)
+					dmg += beat == 2 ? d(2,8) : rnd(8);
+				beat = entangle_beatitude(&youmonst, 1);
+				if(hates_holy(youracedata) && beat)
+					dmg += beat == 2 ? rnd(20) : rnd(4);
+				losehp(dmg, "being sliced to ribbons by razor wire", KILLED_BY);
+			}
+		}
+	}
+	
 	if(u.uswallow) {
 		if(u.spiritPColdowns[PWR_PHASE_STEP] >= moves+20){
 			You("pass right through %s!", mon_nam(u.ustuck));
@@ -1120,6 +1148,7 @@ domove()
 		}
 		if(!isok(x, y)) {
 			nomul(0, NULL);
+			flags.move |= MOVE_CANCELLED;
 			return;
 		}
 		if (((trap = t_at(x, y)) && trap->tseen) ||
@@ -1287,7 +1316,7 @@ domove()
 			struct obj *otmp;
 			attk = mon_get_attacktype(&youmonst, AT_WEAP, &attkbuff);
 			otmp = uwep;
-			do{
+			if(attk) do {
 				/* Club-claw insight weapons strike additional targets if your insight is high enough to perceive the claw */
 				if(!(result&(MM_AGR_DIED|MM_AGR_STOP)) && u.uinsight >= 15 && otmp && otmp->otyp == CLUB && check_oprop(otmp, OPROP_CCLAW)){
 					result |= hit_with_cclaw(&youmonst, otmp, x, y, 0, attk);
@@ -1300,11 +1329,23 @@ domove()
 				if(!(result&(MM_AGR_DIED|MM_AGR_STOP)) && u.uinsight >= 20 && otmp && rakuyo_prop(otmp)){
 					result |= hit_with_rblood(&youmonst, otmp, x, y, 0, attk);
 				}
+				/* Streaming mercurial weapons hit an aditional target if your insight is high enough */
+				if(!(result&(MM_AGR_DIED|MM_AGR_STOP)) && otmp && is_streaming_merc(otmp)){
+					if(mlev(&youmonst) > 20 && (u.uinsight > 20 && (u.ualign.type == A_CHAOTIC || u.ualign.type == A_NONE))){
+						result |= hit_with_streaming(&youmonst, otmp, x, y, 0, attk);
+					}
+				}
+				/* Dancers hit additional targets */
+				if(!(result&(MM_AGR_DIED|MM_AGR_STOP)) && is_dancer(&youmonst)){
+					result |= hit_with_dance(&youmonst, otmp, x, y, 0, attk);
+				}
 				
+				if(!u.twoweap)
+					break;
 				attk = mon_get_attacktype(&youmonst, AT_XWEP, &attkbuff);
 				otmp = uswapwep;
 				i++;
-			} while(i < 2);
+			} while(i < 2 && attk);
 		}
 		// unmap_object(x, y); /* known empty -- remove 'I' if present */
 		if (glyph_is_invisible(levl[x][y].glyph)) {
@@ -1338,6 +1379,17 @@ domove()
 		You("are rooted %s.",
 		    Levitation || Weightless || Is_waterlevel(&u.uz) ?
 		    "in place" : "to the ground");
+		nomul(0, NULL);
+		return;
+	}
+	if(u.uentangled_oid && !u.usteed){
+		You("struggle against your bindings!");
+		nomul(0, NULL);
+		return;
+	}
+	if(u.usteed && u.usteed->entangled_oid){
+		pline("Your steed struggles against its bindings!");
+		flags.move |= MOVE_CANCELLED;
 		nomul(0, NULL);
 		return;
 	}
@@ -1621,18 +1673,32 @@ domove()
 	    if (mtmp->m_ap_type) seemimic(mtmp);
 
 	    if (mtmp->mtrapped &&
-		    (trap = t_at(mtmp->mx, mtmp->my)) != 0 &&
-		    (trap->ttyp == PIT || trap->ttyp == SPIKED_PIT) &&
-		    boulder_at(trap->tx, trap->ty)) {
-		/* can't swap places with pet pinned in a pit by a boulder */
-		u.ux = u.ux0,  u.uy = u.uy0;	/* didn't move after all */
+		    (trap = t_at(mtmp->mx, mtmp->my)) != 0 && ((
+				(trap->ttyp == PIT || trap->ttyp == SPIKED_PIT) &&
+				boulder_at(trap->tx, trap->ty)
+			) || (
+				(trap->ttyp == VIVI_TRAP)
+			)
+		)) {
+			/* can't swap places with pet pinned in a pit by a boulder, or one stuck in an essence trap */
+			u.ux = u.ux0,  u.uy = u.uy0;	/* didn't move after all */
 	    } else if (u.ux0 != x && u.uy0 != y &&
 		       bad_rock(mtmp, x, u.uy0) &&
 		       bad_rock(mtmp, u.ux0, y) &&
-		       (bigmonst(mtmp->data) || (curr_mon_load(mtmp) > 600))) {
-		/* can't swap places when pet won't fit thru the opening */
-		u.ux = u.ux0,  u.uy = u.uy0;	/* didn't move after all */
-		You("stop.  %s won't fit through.", upstart(y_monnam(mtmp)));
+		       (bigmonst(mtmp->data) || (curr_mon_load(mtmp) > 600))
+		){
+			/* can't swap places when pet won't fit thru the opening */
+			u.ux = u.ux0,  u.uy = u.uy0;	/* didn't move after all */
+			You("stop.  %s won't fit through.", upstart(y_monnam(mtmp)));
+	    } else if (mtmp->mpeaceful && !mtmp->mtame
+		    && (!goodpos(u.ux0, u.uy0, mtmp, 0)
+			|| t_at(u.ux0, u.uy0) != NULL
+			|| mtmp->m_id == quest_status.leader_m_id)
+		) {
+			u.ux = u.ux0, u.uy = u.uy0; /* didn't move after all */
+			You("stop. %s doesn't want to swap places.",
+				upstart(y_monnam(mtmp)));
+
 	    } else if (mtmp->mpeaceful && !mtmp->mtame
 		    && (!goodpos(u.ux0, u.uy0, mtmp, 0)
 			|| t_at(u.ux0, u.uy0) != NULL
@@ -1894,6 +1960,17 @@ stillinwater:;
 			zap_over_floor(u.ux, u.uy, AD_COLD, WAND_CLASS, FALSE, NULL);
 		}
 	}
+	if(!Levitation && !Flying && In_quest(&u.uz) && urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH && levl[u.ux][u.uy].typ == AIR){
+		if(on_level(&u.uz, &qstart_level) && !ok_to_quest()){
+			pline("A mysterious force prevents you from falling.");
+		} else {
+			struct d_level target_level;
+			target_level.dnum = u.uz.dnum;
+			target_level.dlevel = qlocate_level.dlevel+1;
+			int dist = qlocate_level.dlevel+1 - u.uz.dlevel;
+			schedule_goto(&target_level, FALSE, TRUE, FALSE, "You plummet through the cavern air!", "You slam into the rocky floor!", d(dist*5,6), 0);
+		}
+	}
 	check_special_room(FALSE);
 #ifdef SINKS
 	if(IS_SINK(levl[u.ux][u.uy].typ) && Levitation)
@@ -1922,8 +1999,7 @@ stillinwater:;
 			    pline("Its blow glances off your helmet.");
 				if(((mtmp->m_lev) - 8) > 0){
 				    dmg = d((mtmp->m_lev) - 5,3);
-				    if(Half_physical_damage) dmg = (dmg+1) / 2;
-					if(u.uvaul_duration) dmg = (dmg + 1) / 2;
+					dmg = reduce_dmg(&youmonst,dmg,TRUE,FALSE);
 				    mdamageu(mtmp, dmg);
 				}
 			}
@@ -1932,8 +2008,7 @@ stillinwater:;
 			    pline("Its blow glances off your head.");
 				if(((mtmp->m_lev) - 8) > 0){
 				    dmg = d((mtmp->m_lev) - 5,3);
-				    if(Half_physical_damage) dmg = (dmg+1) / 2;
-					if(u.uvaul_duration) dmg = (dmg + 1) / 2;
+					dmg = reduce_dmg(&youmonst,dmg,TRUE,FALSE);
 				    mdamageu(mtmp, dmg);
 				}
 			} else if (u.uac + 3 <= rnd(20))
@@ -1944,8 +2019,7 @@ stillinwater:;
 			    You("are hit by %s!",
 				x_monnam(mtmp, ARTICLE_A, "falling", 0, TRUE));
 			    dmg = d(mtmp->m_lev,6);
-			    if(Half_physical_damage) dmg = (dmg+1) / 2;
-				if(u.uvaul_duration) dmg = (dmg + 1) / 2;
+				dmg = reduce_dmg(&youmonst,dmg,TRUE,FALSE);
 			    mdamageu(mtmp, dmg);
 			}
 			break;
@@ -2549,6 +2623,7 @@ nomul(nval, txt)
 	if(multi < nval) return;	/* This is a bug fix by ab@unido */
 	u.uinvulnerable = FALSE;	/* Kludge to avoid ctrl-C bug -dlc */
 	u.usleep = 0;
+	u.puzzle_time = 0;
 	if(!flags.forcefight) multi = nval;
 	flags.travel = iflags.travel1 = flags.mv = flags.run = 0;
 	if (txt && txt[0])
@@ -2568,7 +2643,43 @@ const char *msg_override;
 	else if (!nomovemsg) nomovemsg = You_can_move_again;
 	if (*nomovemsg) pline1(nomovemsg);
 	nomovemsg = 0;
+	struct obj *puzzle = get_most_complete_puzzle();
+	if(puzzle){
+		if(u.puzzle_time && (monstermoves - u.usleep) >= u.puzzle_time){
+			int difficulty = puzzle->ovar1_puzzle_steps + 1;
+			difficulty *= 6;
+			if(objects[HYPERBOREAN_DIAL].oc_name_known)
+				difficulty -= 6;
+			difficulty -= u.uinsight;
+			difficulty -= ACURR(A_INT);
+			if(rnd(20) >= difficulty && !(u.veil && puzzle->ovar1_puzzle_steps >= 5)){
+				if(u.uhyperborean_steps < 6){
+					if(puzzle->ovar1_puzzle_steps == u.uhyperborean_steps){
+						more_experienced(6*pow(10,u.uhyperborean_steps), 0);
+						newexplevel();
+						u.uhyperborean_steps++;
+						if(u.uhyperborean_steps == 6){
+							You("have solved the sixth and final ring of %s!", the(xname(puzzle)));
+							/*With appologies to "Through the Gates of the Silver Key" and "The Dunwich Horror" by H. P. Lovecraft. */
+							pline("The hexagonal pegs are now oddly arranged, seeming to follow the symmetries of some cosmic geometry quite unknown to Earth.");
+							pline("You have the faintest sense, as though from a memory within a dream, of strange shapes surmounting hexagonal pillars, and a voice that spoke without speaking.");
+							pline("A seal is engraved into your mind!");
+							u.specialSealsKnown |= SEAL_YOG_SOTHOTH;
+						}
+						else {
+							You("have solved the next ring of %s!", the(xname(puzzle)));
+						}
+					}
+					else You("have solved the next ring of %s.", the(xname(puzzle)));
+					puzzle->ovar1_puzzle_steps++;
+				}
+			}
+			else You("haven't made any headway on the puzzle.");
+		}
+		else You("awaken before you can make any serious attempt on the puzzle.");
+	}
 	u.usleep = 0;
+	u.puzzle_time = 0;
 	if (afternmv) (*afternmv)();
 	afternmv = 0;
 }
@@ -2692,6 +2803,8 @@ register int n;
 	//ifdef BARD
 	if (n > 0){
 		n += mtmp->encouraged;
+		if(flags.spriest_level && is_demon(mtmp->data) && is_lawful_mon(mtmp) && !mtmp->mpeaceful)
+			n += 9;
 		if (uwep && uwep->oartifact == ART_SINGING_SWORD && !mindless_mon(mtmp) && !is_deaf(mtmp)){
 			if (uwep->osinging == OSING_DIRGE && !mtmp->mtame){
 				n -= uwep->spe + 1;
@@ -2771,6 +2884,11 @@ weight_cap()
 
 		/* these carrcap modifiers only make sense if you have feet on the ground */
 		if (boots && boots->otyp == find_hboots()) carrcap += 100;
+		
+		if (boots && check_oprop(boots, OPROP_RBRD)
+			&& u.ualign.record >= 20 && u.ualign.type != A_CHAOTIC && u.ualign.type != A_NEUTRAL
+		)
+			carrcap += max(200, maxcap/5);
 		
 		if (!u.usteed && !Flying) {
 			if(EWounded_legs & LEFT_SIDE) carrcap -= 100;

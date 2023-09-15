@@ -195,7 +195,7 @@ shuffle_all()
 			int j = last-1;
 
 			if (oclass == POTION_CLASS)
-			    j -= 6;  /* goat's milk, space mead, water, starlight, amnesia, and blood have fixed descriptions */
+			    j -= 7;  /* primordial waters, goat's milk, space mead, water, starlight, amnesia, and blood have fixed descriptions */
 			if (oclass == RING_CLASS)
 				first += 1;	/* three wishes has a fixed description */
 			if (oclass == WAND_CLASS)
@@ -520,7 +520,7 @@ find_good_fring()
     return 0;
 }
 
-/* find the object index for a non-polymorph iron ring */
+/* find the object index for a non-polymorph diamond (adamant) or silver ring */
 int
 find_good_wring()
 {
@@ -539,7 +539,7 @@ find_good_wring()
     return 0;
 }
 
-/* find the object index for a non-polymorph iron ring */
+/* find the object index for a non-polymorph sapphire or brass ring */
 int
 find_good_aring()
 {
@@ -1450,8 +1450,8 @@ struct obj *otmp;
 		&& materials[objects[otmp->otyp].oc_material].color == objects[otmp->otyp].oc_color)
 	{
 		/* Fancy gem colors */
-		if (otmp->obj_material == GEMSTONE && otmp->ovar1 && !obj_type_uses_ovar1(otmp) && !obj_art_uses_ovar1(otmp)){
-			otmp->obj_color = objects[otmp->ovar1].oc_color;
+		if (otmp->obj_material == GEMSTONE && otmp->sub_material){
+			otmp->obj_color = objects[otmp->sub_material].oc_color;
 			return;
 		}
 		/* Dragon hide/bone discrepancy -- dragonhide should be leather colored, not bone colored.
@@ -1565,6 +1565,21 @@ struct obj *otmp;
 	
 	//Use the set color.
 	return otmp->obj_color;
+}
+
+void
+set_submat(otmp, submat)
+struct obj *otmp;
+int submat;
+{
+	/* should never happen */
+	if (!otmp)
+	{
+		impossible("set_submat called with no object");
+		return;
+	}
+	otmp->sub_material = submat;
+	object_color(otmp);
 }
 
 void

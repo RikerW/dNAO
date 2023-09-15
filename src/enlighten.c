@@ -3,6 +3,7 @@
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
+#include "mutations.h"
 
 STATIC_DCL void FDECL(enlght_line, (const char *,const char *,const char *, boolean));
 STATIC_DCL void FDECL(put_or_dump, (const char *, boolean));
@@ -11,12 +12,14 @@ STATIC_DCL int NDECL(minimal_enlightenment);
 STATIC_DCL void NDECL(resistances_enlightenment);
 STATIC_DCL void NDECL(signs_enlightenment);
 STATIC_DCL void NDECL(spirits_enlightenment);
+STATIC_DCL void NDECL(mutations_enlightenment);
 
 #define DOATTRIB_RESISTS	1
 #define DOATTRIB_ARMOR		2
 #define DOATTRIB_ENLIGHTEN	3
 #define DOATTRIB_BINDINGS	4
 #define DOATTRIB_SPIRITS	5
+#define DOATTRIB_MUTATIONS	6
 
 /* -enlightenment and conduct- */
 static winid en_win;
@@ -129,6 +132,9 @@ doattributes()
 			break;
 		case DOATTRIB_SPIRITS:
 			spirits_enlightenment();
+			break;
+		case DOATTRIB_MUTATIONS:
+			mutations_enlightenment();
 			break;
 		default:
 			return MOVE_INSTANT;
@@ -330,6 +336,15 @@ minimal_enlightenment()
 		//spirits_enlightenment();
 	}
 
+	if (any_mutation()) {
+		Sprintf(buf, "Show your mutations.");
+		any.a_int = DOATTRIB_MUTATIONS;
+		add_menu(tmpwin, NO_GLYPH, &any,
+			'f', 0, ATR_NONE, buf,
+			MENU_UNSELECTED);
+		//spirits_enlightenment();
+	}
+
 	end_menu(tmpwin, "Base Attributes");
 	n = select_menu(tmpwin, PICK_ONE, &selected);
 	destroy_nhwindow(tmpwin);
@@ -489,7 +504,7 @@ boolean dumping;
 		if(!u.spirit[QUEST_SPIRIT] && u.specialSealsKnown&(SEAL_DAHLVER_NAR|SEAL_ACERERAK|SEAL_BLACK_WEB)){
 			you_are("able to bind with a quest spirit");
 		}
-		if(!u.spirit[ALIGN_SPIRIT] && u.specialSealsKnown&(SEAL_COSMOS|SEAL_LIVING_CRYSTAL|SEAL_TWO_TREES|SEAL_MISKA|SEAL_NUDZIRATH|SEAL_ALIGNMENT_THING|SEAL_UNKNOWN_GOD)){
+		if(!u.spirit[ALIGN_SPIRIT] && u.specialSealsKnown&(SEAL_COSMOS|SEAL_LIVING_CRYSTAL|SEAL_TWO_TREES|SEAL_MISKA|SEAL_NUDZIRATH|SEAL_ALIGNMENT_THING|SEAL_UNKNOWN_GOD|SEAL_YOG_SOTHOTH)){
 			you_are("able to bind with an aligned spirit");
 		}
 		if(!u.spirit[OUTER_SPIRIT] && u.ulevel == 30 && Role_if(PM_EXILE)){
@@ -525,6 +540,7 @@ boolean dumping;
 	if (Sleep_resistance) you_are("sleep resistant");
 	if (Half_physical_damage) you_are("resistant to physical damage");
 	if (Half_spell_damage) you_are("resistant to magical damage");
+	if (Gaze_immune) you_are("immune to gaze attacks");
 	if (u.uedibility || u.sealsActive&SEAL_BUER) you_can("recognize detrimental food");
 	// if ( (ublindf && ublindf->otyp == R_LYEHIAN_FACEPLATE && !ublindf->cursed) || 
 		 // (uarmc && uarmc->otyp == OILSKIN_CLOAK && !uarmc->cursed) ||
@@ -707,7 +723,7 @@ boolean dumping;
 		}
 		if(has_blood(youracedata)){
 			if (u.umadness&MAD_FRENZY){
-				Sprintf(buf, "your %s seethe below your %s", body_part(BLOOD), body_part(BODY_SKIN));
+				Sprintf(buf, "your %s seethes below your %s", body_part(BLOOD), body_part(BODY_SKIN));
 				enl_msg("You ", "feel ", "felt ", buf);
 			}
 		}
@@ -724,7 +740,7 @@ boolean dumping;
 			enl_msg("You ", "wish", "wished", " to stand in partially illuminated areas, suffering reduced accuracy and sometimes failing to cast spells if not");
 		}
 		if (u.umadness&MAD_FORGETFUL){
-			enl_msg("Your mind ", "is", "was", " disolving");
+			enl_msg("Your mind ", "is", "was", " dissolving");
 		}
 		if (u.umadness&MAD_TOO_BIG){
 			enl_msg("", "It's", "It was", " too big");
@@ -734,6 +750,9 @@ boolean dumping;
 		}
 		if (u.umadness&MAD_ROTTING){
 			enl_msg("Your body ", "is", "was", " rotting from within");
+		}
+		if (u.umadness&MAD_REACHER){
+			enl_msg("Sometimes, a lurking thing ", "tries", "tried", " to reach in and grab you");
 		}
 	}
 	
@@ -1122,7 +1141,7 @@ resistances_enlightenment()
 	
 	if(Deadmagic && base_casting_stat() == A_INT){
 		int i;
-		update_alternate_spells();
+		update_externally_granted_spells();
 		for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++) {
 			putstr(en_win, 0, "Magic is damaged.");
 			break;
@@ -1130,7 +1149,7 @@ resistances_enlightenment()
 	}
 	else if(Catapsi && base_casting_stat() == A_CHA){
 		int i;
-		update_alternate_spells();
+		update_externally_granted_spells();
 		for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++) {
 			putstr(en_win, 0, "Your mind is full of static.");
 			break;
@@ -1138,7 +1157,7 @@ resistances_enlightenment()
 	}
 	else if(Misotheism && base_casting_stat() == A_WIS){
 		int i;
-		update_alternate_spells();
+		update_externally_granted_spells();
 		for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++) {
 			putstr(en_win, 0, "Your mind is full of static.");
 			break;
@@ -1146,7 +1165,7 @@ resistances_enlightenment()
 	}
 	else if(Nullmagic){
 		int i;
-		update_alternate_spells();
+		update_externally_granted_spells();
 		for (i = 0; i < MAXSPELL && spellid(i) != NO_SPELL; i++) {
 			putstr(en_win, 0, "Your magic is blocked.");
 			break;
@@ -1289,7 +1308,7 @@ resistances_enlightenment()
 			messaged++;
 		}
 		if (u.umadness&MAD_THALASSOPHOBIA){
-			putstr(en_win, 0, "You have an irrational fear of sea-monsters.");
+			putstr(en_win, 0, "You have an irrational fear of sea monsters.");
 			messaged++;
 		}
 		if (u.umadness&MAD_PARANOIA){
@@ -1327,7 +1346,7 @@ resistances_enlightenment()
 		}
 		if(has_blood(youracedata)){
 			if (u.umadness&MAD_FRENZY){
-				Sprintf(buf, "You feel your %s seethe below your %s.", body_part(BLOOD), body_part(BODY_SKIN));
+				Sprintf(buf, "You feel your %s seethes below your %s.", body_part(BLOOD), body_part(BODY_SKIN));
 				putstr(en_win, 0, buf);
 				messaged++;
 			}
@@ -1345,7 +1364,7 @@ resistances_enlightenment()
 			putstr(en_win, 0, "You are fascinated by the dancing shadows.");
 		}
 		if (u.umadness&MAD_FORGETFUL){
-			putstr(en_win, 0, "Your mind is disolving.");
+			putstr(en_win, 0, "Your mind is dissolving.");
 		}
 		if (u.umadness&MAD_TOO_BIG){
 			putstr(en_win, 0, "It's too BIG!");
@@ -1355,6 +1374,9 @@ resistances_enlightenment()
 		}
 		if (u.umadness&MAD_ROTTING){
 			putstr(en_win, 0, "Your body is rotting from within.");
+		}
+		if (u.umadness&MAD_REACHER){
+			putstr(en_win, 0, "You are being stalked by a blasphemous reacher.");
 		}
 		if(messaged){
 			//Clockworks specifically can't get drunk (androids can)
@@ -1550,6 +1572,15 @@ resistances_enlightenment()
 				if(numFound==numBound-1) Strcat(buf,", and ");
 			}
 		}
+		if(numFound < numBound && u.specialSealsActive&SEAL_YOG_SOTHOTH){
+			Strcat(buf, sealNames[(YOG_SOTHOTH) - (FIRST_SEAL)]);
+			numFound++;
+			if(numBound==2 && numFound==1) Strcat(buf," and ");
+			else if(numBound>=3){
+				if(numFound<numBound-1) Strcat(buf,", ");
+				if(numFound==numBound-1) Strcat(buf,", and ");
+			}
+		}
 		if(numFound < numBound && u.specialSealsActive&SEAL_ALIGNMENT_THING){
 			Strcat(buf, sealNames[(ALIGNMENT_THING) - (FIRST_SEAL)]);
 			numFound++;
@@ -1699,7 +1730,8 @@ spirits_enlightenment()
 	/* only show quest spirits if you know either seal */
 	if ((u.specialSealsKnown & (SEAL_ACERERAK | SEAL_DAHLVER_NAR | SEAL_BLACK_WEB))
 		/* needs special case for myrkalfyr who don't know the seal, but are bound anyways */
-		|| (u.specialSealsActive&SEAL_BLACK_WEB)) {
+		|| (u.specialSealsActive&SEAL_BLACK_WEB)
+	) {
 		putstr(en_win, 0, "Quest Spirit");
 		if (u.spirit[QUEST_SPIRIT] != 0L) {
 			addseal(QUEST_SPIRIT);
@@ -1717,6 +1749,7 @@ spirits_enlightenment()
 			SEAL_MISKA |
 			SEAL_NUDZIRATH |
 			SEAL_ALIGNMENT_THING |
+			SEAL_YOG_SOTHOTH |
 			SEAL_UNKNOWN_GOD
 			)) {
 		putstr(en_win, 0, "Alignment Spirit");
@@ -1800,7 +1833,7 @@ signs_enlightenment()
 	if(u.sealsActive&SEAL_AMON && !Invis){
 //		if(!(uarmh && is_metallic(uarmh))){
 		putstr(en_win, 0, "You have a pair of large ram's horns.");
-//		} else putstr(en_win, 0, "Your ram's horns have fused with your helm, taking on a metalic hue.");
+//		} else putstr(en_win, 0, "Your ram's horns have fused with your helm, taking on a metallic hue.");
 		message = TRUE;
 	}
 	if(u.sealsActive&SEAL_ANDREALPHUS && !Invis && !(levl[u.ux][u.uy].lit == 0 && !(viz_array[u.uy][u.ux]&TEMP_LIT1 && !(viz_array[u.uy][u.ux]&TEMP_DRK3)))){
@@ -2054,7 +2087,7 @@ signs_enlightenment()
 		message = TRUE;
 	}
 	if(u.specialSealsActive&SEAL_MISKA && u.ulevel >= 10){
-		static char mbuf[BUFSZ] = {'\0'};
+		char mbuf[BUFSZ] = {'\0'};
 		if(u.ulevel >= 26){
 			int howManyArms = (youracedata->mtyp == PM_VALAVI) ? 6 : 
 						  (youracedata->mtyp == PM_MAN_SERPENT_MAGE) ? 6 : 
@@ -2080,6 +2113,24 @@ signs_enlightenment()
 	if(u.specialSealsActive&SEAL_ALIGNMENT_THING){
 		putstr(en_win, 0, "You feel like someone is staring at the back of your head.");
 		putstr(en_win, 0, "You hear an argument raging in the distance.");
+		message = TRUE;
+	}
+	if(u.specialSealsActive&SEAL_YOG_SOTHOTH){
+		if(!uarm && !(uarmu && arm_blocks_lower_body(uarmu->otyp))){
+			putstr(en_win, 0, "You have a belt of writhing leeches.");
+		}
+		else if(u.specialSealsActive&SEAL_YOG_SOTHOTH && !Invis && moves <= u.yogAttack+5){
+			putstr(en_win, 0, "Your waist-tentacles wave around in search of further prey.");
+		}
+		else{
+			putstr(en_win, 0, "Your blood-sucking tentacles are hidden by your clothes.");
+		}
+		if(!uarmf){
+			putstr(en_win, 0, "Your feet are circular and ridgy-veined.");
+		}
+		else {
+			putstr(en_win, 0, "Your circular feet are hidden by your boots.");
+		}
 		message = TRUE;
 	}
 	if(u.specialSealsActive&SEAL_NUMINA){
@@ -2339,7 +2390,7 @@ signs_mirror()
 	if(u.sealsActive&SEAL_AMON && !Invis){
 		if(!(uarmh && is_metallic(uarmh))){
 			putstr(en_win, 0, "You have a pair of large ram's horns.");
-		} else putstr(en_win, 0, "Your ram's horns have fused with your helm, taking on a metalic hue.");
+		} else putstr(en_win, 0, "Your ram's horns have fused with your helm, taking on a metallic hue.");
 		message = TRUE;
 	}
 	if(u.sealsActive&SEAL_ANDREALPHUS && !Invis && (dimness(u.ux, u.uy) <= 0)) {
@@ -2350,7 +2401,7 @@ signs_mirror()
 		if(dimness(u.ux, u.uy) <= 0)
 			putstr(en_win, 0, "Your rigid features can't be seen in the dark.");
 		else if((ublindf && (ublindf->otyp==MASK || ublindf->otyp==R_LYEHIAN_FACEPLATE)) //face-covering mask
-			 || (uarmh && (uarmh->otyp==PLASTEEL_HELM || uarmh->otyp==PONTIFF_S_CROWN || uarmh->otyp==FACELESS_HELM)) //opaque face-covering helm
+			 || (uarmh && (uarmh->otyp==PLASTEEL_HELM || uarmh->otyp==PONTIFF_S_CROWN || uarmh->otyp==FACELESS_HELM || uarmh->otyp==IMPERIAL_ELVEN_HELM)) //opaque face-covering helm
 			 || (uarmc && (uarmc->otyp==WHITE_FACELESS_ROBE || uarmc->otyp==BLACK_FACELESS_ROBE || uarmc->otyp==SMOKY_VIOLET_FACELESS_ROBE))//face-covering robe
 		) putstr(en_win, 0, "Your rigid features can't be seen through your disguise.");
 		else putstr(en_win, 0, "Your features have taken on the rigidity of a cheap disguise.");
@@ -2654,6 +2705,44 @@ signs_mirror()
 			message = TRUE;
 		}
 	}
+	if(u.specialSealsActive&SEAL_YOG_SOTHOTH && !Invis){
+		if(check_mutation(YOG_GAZE_2)){
+			if(ublindf && ublindf->otyp != LENSES && ublindf->otyp != SUNGLASSES && ublindf->otyp != LIVING_MASK){
+				char mbuf[BUFSZ] = {0};
+				Sprintf(mbuf, "Your flaming eyes are hidden by your %s.", xname(ublindf));
+				putstr(en_win, 0, mbuf);
+			}
+			else {
+				putstr(en_win, 0, "Magenta flames flare from your eyesockets.");
+			}
+		}
+		else if(check_mutation(YOG_GAZE_1)){
+			if(ublindf && ublindf->otyp != LENSES && ublindf->otyp != LIVING_MASK){
+				char mbuf[BUFSZ] = {0};
+				Sprintf(mbuf, "Your fiery eyes are hidden by your %s.", xname(ublindf));
+				putstr(en_win, 0, mbuf);
+			}
+			else {
+				putstr(en_win, 0, "Your eyes have irises of magenta fire.");
+			}
+		}
+		if(!uarm && !(uarmu && arm_blocks_lower_body(uarmu->otyp))){
+			putstr(en_win, 0, "You have a belt of writhing leeches.");
+		}
+		else if(!Invis && moves <= u.yogAttack+5){
+			putstr(en_win, 0, "Your waist-tentacles wave around in search of further prey.");
+		}
+		else {
+			putstr(en_win, 0, "Your blood-sucking tentacles are hidden by your clothes.");
+		}
+		if(!uarmf){
+			putstr(en_win, 0, "Your feet are circular and ridgy-veined.");
+		}
+		else {
+			putstr(en_win, 0, "Your circular feet are hidden by your boots.");
+		}
+		message = TRUE;
+	}
 	
 	if(!message){
 		putstr(en_win, 0, "You think you look pretty normal.");
@@ -2780,6 +2869,7 @@ boolean dumping;
 	CHECK_ACHIEVE(CAV_QUEST,"Serpent slayer: completed caveman quest")
 	CHECK_ACHIEVE(CON_QUEST,"Sentence commuted: completed convict quest")
 	CHECK_ACHIEVE(KNI_QUEST,"Into the crystal cave: completed knight quest")
+	CHECK_ACHIEVE(HEA_QUEST,"Plague of stolen lives: completed healer quest")
 	CHECK_ACHIEVE(ANA_QUEST,"Back from the future: completed anachrononaut quest")
 	CHECK_ACHIEVE(AND_QUEST,"Glory to mankind: completed android quest")
 	CHECK_ACHIEVE(BIN_QUEST,"33 spirits: completed binder quest")
@@ -2787,10 +2877,12 @@ boolean dumping;
 	CHECK_ACHIEVE(BRD_QUEST,"Not so spoony: completed bard quest")
 	CHECK_ACHIEVE(NOB_QUEST,"Rebellion crushed: completed base noble quest")
 	CHECK_ACHIEVE(MAD_QUEST,"Oh good. I'm not crazy: completed madman quest")
+	CHECK_ACHIEVE(MONK_QUEST,"You must defeat Sheng Long to stand a chance: completed monk quest")
 	CHECK_ACHIEVE(HDR_NOB_QUEST,"Family drama: completed hedrow noble quest")
 	CHECK_ACHIEVE(HDR_SHR_QUEST,"On agency: completed hedrow shared quest")
 	CHECK_ACHIEVE(DRO_NOB_QUEST,"Foreshadowing: completed drow noble quest")
 	CHECK_ACHIEVE(DRO_SHR_QUEST,"Old friends: completed drow shared quest")
+	CHECK_ACHIEVE(DRO_HEA_QUEST,"Twisted by dreams: completed drow healer quest")
 	CHECK_ACHIEVE(DWA_NOB_QUEST,"Durin's Bane's Bane: completed dwarf noble quest")
 	CHECK_ACHIEVE(DWA_KNI_QUEST,"Battle of (5-4) armies: completed dwarf knight quest")
 	CHECK_ACHIEVE(GNO_RAN_QUEST,"Strongest of all time: completed gnome ranger quest")
@@ -2810,11 +2902,12 @@ boolean dumping;
 	CHECK_ACHIEVE(CASTLE_WISH,"Completed the castle")
 	CHECK_ACHIEVE(ILLUMIAN,"Became illuminated")
 	CHECK_ACHIEVE(RESCUE,"Lead an exodus")
-	CHECK_ACHIEVE(FULL_LOADOUT,"Super Fighting Robot: fully upgraded a clockwork automata")
+	CHECK_ACHIEVE(FULL_LOADOUT,"Super Fighting Robot: fully upgraded a clockwork automaton")
 	CHECK_ACHIEVE(NIGHTMAREHUNTER,"Hunter of Nightmares")
 	CHECK_ACHIEVE(QUITE_MAD,"Quite Mad: Suffered six madnesses")
 	CHECK_ACHIEVE(TOTAL_DRUNK,"Booze Hound")
 	CHECK_ACHIEVE(BOKRUG_QUEST,"Detestable gods: Completed Bokrug's ascension ritual")
+	CHECK_ACHIEVE(IEA_UPGRADES,"The Elfdalorian: 15+ upgrades on a set of imperial elven armor")
 		
 #undef	CHECK_ACHIEVE
 	}
@@ -2823,6 +2916,30 @@ boolean dumping;
 		display_nhwindow(en_win, TRUE);
 		destroy_nhwindow(en_win);
 	}
+}
+
+STATIC_OVL void
+mutations_enlightenment()
+{
+	char buf[BUFSZ];
+	int i;
+	en_win = create_nhwindow(NHW_MENU);
+	extern const struct mutationtype mutationtypes[];
+
+	for(i= 0; mutationtypes[i].mutation; i++){
+		if(check_mutation(mutationtypes[i].mutation)
+			&& (mutationtypes[i].mutation != YOG_GAZE_1 || u.specialSealsActive&SEAL_YOG_SOTHOTH)
+			&& (mutationtypes[i].mutation != YOG_GAZE_2 || u.specialSealsActive&SEAL_YOG_SOTHOTH)
+			&& (mutationtypes[i].mutation != TWIN_MIND || u.specialSealsActive&SEAL_YOG_SOTHOTH)
+			&& (mutationtypes[i].mutation != TWIN_DREAMS || u.specialSealsActive&SEAL_YOG_SOTHOTH)
+			&& (mutationtypes[i].mutation != TWIN_SAVE || mtyp_on_level(PM_TWIN_SIBLING))
+		){
+			putstr(en_win, 0, mutationtypes[i].description);
+		}
+	}
+	display_nhwindow(en_win, TRUE);
+	destroy_nhwindow(en_win);
+	return;
 }
 
 /*enlighten.c*/

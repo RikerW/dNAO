@@ -952,6 +952,7 @@ clear_level_structures()
 	level.damagelist = (struct damage *)0;
 
 	level.flags.nfountains = 0;
+	level.flags.nforges = 0;
 	level.flags.nsinks = 0;
 	
 	level.flags.goldkamcount_hostile = 0;
@@ -1055,6 +1056,16 @@ makelevel()
 			}
 			else if(Role_if(PM_MADMAN) && qstart_level.dnum == u.uz.dnum && qlocate_level.dlevel == (u.uz.dlevel+1)){
 				Sprintf(fillname, "%s-home", urole.filecode);
+				// pline("%s",fillname);
+				makemaz(fillname);
+			}
+			else if(Role_if(PM_HEALER) && Race_if(PM_DROW) && qstart_level.dnum == u.uz.dnum && qstart_level.dlevel == (u.uz.dlevel-1)){
+				Sprintf(fillname, "%s-secn", urole.filecode);
+				// pline("%s",fillname);
+				makemaz(fillname);
+			}
+			else if(Role_if(PM_HEALER) && Race_if(PM_DROW) && qstart_level.dnum == u.uz.dnum && qlocate_level.dlevel == (u.uz.dlevel-1)){
+				Sprintf(fillname, "%s-flor", urole.filecode);
 				// pline("%s",fillname);
 				makemaz(fillname);
 			}
@@ -1281,6 +1292,9 @@ skip0:
 		if(!rn2(60)) {
 		    if(mkfeature(SINK, FALSE, croom))
 				x -= 20;
+		}
+		if(!rn2(40)) {
+		    mkfeature(FORGE, FALSE, croom);
 		}
 
 		if (x < 2) x = 2;
@@ -2000,6 +2014,13 @@ struct mkroom *croom;
 		if (!rn2(7)) levl[m.x][m.y].blessedftn = 1;
 		level.flags.nfountains++;
 		break;
+	case FORGE:
+		/* Put a fountain at m.x, m.y */
+		levl[m.x][m.y].typ = FORGE;
+		/* Is it a "blessed" forge? (affects drinking from forge) */
+		// if (!rn2(7)) levl[m.x][m.y].blessedftn = 1;
+		level.flags.nforges++;
+		break;
 	case SINK:
 		/* Put a sink at m.x, m.y */
 		levl[m.x][m.y].typ = SINK;
@@ -2092,6 +2113,7 @@ int x, y, hv_id;
 		case VN_APOCALYPSE:
 		case VN_HARROWER:
 		case VN_MAD_ANGEL:
+		case VN_JRT:
 			mid = PM_ANGEL;
 		break;
 		case VN_N_PIT_FIEND:

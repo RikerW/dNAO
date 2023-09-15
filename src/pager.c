@@ -25,6 +25,7 @@ STATIC_DCL char * get_mb_description_of_monster_type(struct monst *, char *);
 STATIC_DCL char * get_ma_description_of_monster_type(struct monst *, char *);
 STATIC_DCL char * get_mv_description_of_monster_type(struct monst *, char *);
 STATIC_DCL char * get_mg_description_of_monster_type(struct monst *, char *);
+STATIC_DCL char * get_mw_description_of_monster_type(struct monst *, char *);
 STATIC_DCL char * get_speed_description_of_monster_type(struct monst *, char *);
 STATIC_DCL char * get_description_of_attack_type(uchar);
 STATIC_DCL char * get_description_of_damage_type(uchar);
@@ -1714,6 +1715,7 @@ get_mb_description_of_monster_type(struct monst * mtmp, char * description)
 	many = append(description, nogloves(ptr)			, "handless"				, many);
 	many = append(description, nolimbs(ptr)				, "limbless"				, many);
 	many = append(description, !has_head(ptr)			, "headless"				, many);
+	many = append(description, has_head(ptr) && nohat(ptr), "can't wear helms"		, many);
 	many = append(description, has_horns(ptr)			, "has horns"				, many);
 	many = append(description, is_whirly(ptr)			, "whirly"					, many);
 	many = append(description, flaming(ptr)				, "flaming"					, many);
@@ -1780,6 +1782,7 @@ get_ma_description_of_monster_type(struct monst * mtmp, char * description)
 	many = append(description, (ptr->mflagsa & MA_ET)			, "alien"				, many);
 	many = append(description, (ptr->mflagsa & MA_G_O_O)		, "great old one"		, many);
 	many = append(description, (ptr->mflagsa & MA_XORN)			, "xorn"				, many);
+	many = append(description, (many==0)						, "sui generis"			, many);
 	strcat(description, ". ");
 	return description;
 }
@@ -1833,6 +1836,37 @@ char * get_mg_description_of_monster_type(struct monst * mtmp, char * descriptio
 }
 
 char *
+get_mw_description_of_monster_type(struct monst * mtmp, char * description)
+{
+	struct permonst * ptr = mtmp->data;
+	strcat(description, "Wards: ");
+	int many = 0;
+	many = append(description, (u.wardsknown & WARD_HEPTAGRAM) && !heptUnwardable(mtmp) && heptWarded(mtmp->data)								, "heptagram"			, many);
+	many = append(description, (u.wardsknown & WARD_GORGONEION) && !gorgUnwardable(mtmp) && gorgWarded(mtmp->data)								, "gorgoneion"			, many);
+	many = append(description, (u.wardsknown & WARD_ACHERON) && !standardUnwardable(mtmp) && circleWarded(mtmp->data)							, "circle of acheron"	, many);
+	many = append(description, (u.wardsknown & WARD_PENTAGRAM) && !standardUnwardable(mtmp) && pentWarded(mtmp->data)							, "pentagram"			, many);
+	many = append(description, (u.wardsknown & WARD_HEXAGRAM) && !(standardUnwardable(mtmp) || mtmp->mpeaceful) && hexWarded(mtmp->data)		, "hexagram"			, many);
+	many = append(description, (u.wardsknown & WARD_HAMSA) && !standardUnwardable(mtmp) && hamWarded(mtmp->data)								, "hamsa"				, many);
+	many = append(description, (u.wardsknown & WARD_ELDER_SIGN) && !standardUnwardable(mtmp) && (mtmp->data->mflagsw&MW_ELDER_SIGN)				, "elder sign"			, many);
+	many = append(description, (u.wardsknown & WARD_ELDER_SIGN) && !standardUnwardable(mtmp) && (mtmp->data->mflagsw&MW_EYE_OF_YGG)				, "eye of yggdrasil"	, many);
+	many = append(description, (u.wardsknown & WARD_EYE) && !standardUnwardable(mtmp) && (mtmp->data->mflagsw&MW_ELDER_EYE_ELEM)				, "elder elemental eye"	, many);
+	many = append(description, (u.wardsknown & WARD_EYE) && !standardUnwardable(mtmp) && (mtmp->data->mflagsw&MW_ELDER_EYE_ENERGY)				, "4-fold elemental eye", many);
+	many = append(description, (u.wardsknown & WARD_EYE) && !standardUnwardable(mtmp) && (mtmp->data->mflagsw&MW_ELDER_EYE_PLANES)				, "7-fold elemental eye", many);
+	many = append(description, (u.wardsknown & WARD_QUEEN) && !standardUnwardable(mtmp) && queenWarded(mtmp->data)								, "scion queen mother"	, many);
+	many = append(description, (u.wardsknown & WARD_CAT_LORD) && !(standardUnwardable(mtmp) || catWardInactive) && catWarded(mtmp->data)		, "cat lord"			, many);
+	many = append(description, (u.wardsknown & WARD_GARUDA) && !standardUnwardable(mtmp) && wingWarded(mtmp->data)								, "wings of garuda"		, many);
+	many = append(description, (u.wardsknown & WARD_YELLOW) && !yellowUnwardable(mtmp) && yellowWarded(mtmp->data)								, "yellow sign"		, many);
+	many = append(description, (u.wardsknown & WARD_TOUSTEFNA) && !standardUnwardable(mtmp) && touWarded(mtmp->data)							, "toustefna stave"		, many);
+	many = append(description, (u.wardsknown & WARD_DREPRUN) && !standardUnwardable(mtmp) && dreWarded(mtmp->data)								, "dreprun stave"		, many);
+	many = append(description, (u.wardsknown & WARD_VEIOISTAFUR) && !standardUnwardable(mtmp) && veiWarded(mtmp->data)							, "veioistafur stave"	, many);
+	many = append(description, (u.wardsknown & WARD_THJOFASTAFUR) && !standardUnwardable(mtmp) && thjWarded(mtmp->data)							, "thjofastafur stave"	, many);
+	if(!many)
+		strcat(description, "none known");
+	strcat(description, ". ");
+	return description;
+}
+
+char *
 get_speed_description_of_monster_type(struct monst * mtmp, char * description)
 {
 	int speed = mtmp->data->mmove;
@@ -1879,6 +1913,7 @@ get_description_of_attack_type(uchar id)
 	case AT_KICK: return "kick";
 	case AT_BUTT: return "head butt";
 	case AT_TAIL: return "tail slap";
+	case AT_TONG: return "tongue";
 	case AT_TUCH: return "touch";
 	case AT_STNG: return "sting";
 	case AT_HUGS: return "crushing bearhug";
@@ -2033,6 +2068,7 @@ get_description_of_damage_type(uchar id)
 	case AD_STTP: return "teleports your gear away";
 	case AD_HDRG: return "half-dragon breath";
 	case AD_STAR: return "silver starlight rapier";
+	case AD_BSTR: return "black-star rapier";
 	case AD_EELC: return "elemental electric";
 	case AD_EFIR: return "elemental fire";
 	case AD_EDRC: return "elemental poison (CON)";
@@ -2050,6 +2086,7 @@ get_description_of_damage_type(uchar id)
 	case AD_BLAS: return "blasphemy";
 	case AD_SESN: return "four seasons";
 	case AD_POLN: return "pollen";
+	case AD_FATK: return "forces target to attack";
 	case AD_DUNSTAN: return "stones throw themselves at target";
 	case AD_IRIS: return "iridescent tentacles";
 	case AD_NABERIUS: return "tarnished bloody fangs";
@@ -2092,6 +2129,9 @@ get_description_of_damage_type(uchar id)
 	case AD_PERH: return "level-based damage";
 	case AD_SVPN: return "severe poison";
 	case AD_HLUH: return "corrupted holy energy";
+	case AD_TSMI: return "magic-item-stealing tentacles";
+	case AD_BYAK: return "byakhee eggs";
+	case AD_UNRV: return "unnerving";
 	default:
 			impossible("bug in get_description_of_damage_type(%d)", id);
 			return "<MISSING DESCRIPTION, THIS IS A BUG>";
@@ -2255,6 +2295,11 @@ get_description_of_monster_type(struct monst * mtmp, char * description)
 			strcat(description, "\n");
 			strcat(description, get_ma_description_of_monster_type(mtmp, temp_buf));
 		}
+		if (iflags.pokedex & POKEDEX_SHOW_WARDS){
+			temp_buf[0] = '\0';
+			strcat(description, "\n");
+			strcat(description, get_mw_description_of_monster_type(mtmp, temp_buf));
+		}
 		if (iflags.pokedex & POKEDEX_SHOW_ATTACKS){
 			strcat(description, "\n");
 			strcat(description, "Attacks:");
@@ -2293,6 +2338,12 @@ get_description_of_monster_type(struct monst * mtmp, char * description)
 				strcat(main_temp_buf, "\n");
 				strcat(description, main_temp_buf);
 			} while (!((attk)->aatyp == 0 && (attk)->adtyp == 0 && (attk)->damn == 0 && (attk)->damd == 0));		/* no more attacks */
+		}
+		if(wizard){
+			strcat(description, "Faction (debug-mode-only): ");
+			sprintf(temp_buf, "%d", mtmp->mfaction);
+			strcat(description, temp_buf);
+			strcat(description, "\n");
 		}
 	}
 	return description;

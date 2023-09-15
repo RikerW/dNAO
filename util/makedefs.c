@@ -15,6 +15,7 @@
 #include "dungeon.h"
 #include "obj.h"
 #include "monst.h"
+#include "mutations.h"
 #include "you.h"
 #include "flag.h"
 #include "dlb.h"
@@ -1376,6 +1377,9 @@ struct permonst *ptr;
 		if(ptr->mlevel < ptr->mattk[i].lev_req)
 			continue;
 
+		if(ptr->mattk[i].ins_req > 0)
+			continue;
+
 	    tmp2 = ptr->mattk[i].aatyp;
 	    n += (tmp2 > 0);
 	    n += (tmp2 == AT_MAGC || tmp2 == AT_MMGC || 
@@ -1402,6 +1406,9 @@ struct permonst *ptr;
 	for(i = 0; i < NATTK; i++) {
 
 		if(ptr->mlevel < ptr->mattk[i].lev_req)
+			continue;
+
+		if(ptr->mattk[i].ins_req > 0)
 			continue;
 
 	    tmp2 = ptr->mattk[i].adtyp;

@@ -77,7 +77,7 @@ struct attack *mattk;
 		)
 		return 0;
 
-	if(pagr->mtyp == PM_SMALL_GOAT_SPAWN || pagr->mtyp == PM_GOAT_SPAWN || pagr->mtyp == PM_GIANT_GOAT_SPAWN || has_template(magr, MISTWEAVER) || pagr->mtyp == PM_PHANTASM || pagr->mtyp == PM_BEAUTEOUS_ONE)
+	if(pagr->mtyp == PM_SMALL_GOAT_SPAWN || pagr->mtyp == PM_GOAT_SPAWN || pagr->mtyp == PM_GIANT_GOAT_SPAWN || pagr->mtyp == PM_BLESSED || has_template(magr, MISTWEAVER) || pagr->mtyp == PM_PHANTASM || pagr->mtyp == PM_BEAUTEOUS_ONE)
 		return 1;
 	
 	if(pagr->mlet == S_NYMPH || pagr->mtyp == PM_INCUBUS || pagr->mtyp == PM_SUCCUBUS
@@ -132,9 +132,9 @@ struct monst * mon;
 	}
 
 	/* monster may be worn out (with an exception for the avatar of lolth?) */
-	if ((mon->mcan || mon->mspec_used) && !(
+	if (mon->mcan || (mon->mspec_used && !(
 		mon->mtyp == PM_AVATAR_OF_LOLTH
-	)) {
+	))) {
 		/* message */
 		if (mon->mtyp == PM_INCUBUS || mon->mtyp == PM_SUCCUBUS) {
 			pline("%s acts as though %s has got a %sheadache.",
@@ -185,7 +185,7 @@ struct monst * mon;
 			badeffect = TRUE;
 		}
 	}
-	else if (u.ualign.type == A_CHAOTIC)
+	else if (u.ualign.type == A_CHAOTIC || u.ualign.type == A_NONE)
 		adjalign(1);
 
 	/* select sedu effect */
@@ -833,7 +833,7 @@ register struct obj *obj;
 const char *str;
 boolean helpless;
 {
-	mayberem_common(obj, str, !(rn2(20) < ACURR(A_CHA)));
+	mayberem_common(obj, str, !(rn2(20) < (ACURR(A_CHA) + check_mutation(TENDRIL_HAIR) ? 10 : 0)));
 }
 
 STATIC_OVL void
@@ -842,7 +842,7 @@ register struct obj *obj;
 const char *str;
 boolean helpless;
 {
-	mayberem_common(obj, str, !(rn2(60) < ACURR(A_CHA)));
+	mayberem_common(obj, str, !(rn2(60) < (ACURR(A_CHA) + check_mutation(TENDRIL_HAIR) ? 30 : 0)));
 }
 
 STATIC_OVL void
@@ -851,7 +851,7 @@ register struct obj *obj;
 const char *str;
 boolean helpless;
 {
-	mayberem_common(obj, str, helpless || !(rn2(60) < ACURR(A_CHA)));
+	mayberem_common(obj, str, helpless || !(rn2(60) < (ACURR(A_CHA) + check_mutation(TENDRIL_HAIR) ? 30 : 0)));
 }
 
 STATIC_OVL void
@@ -1021,7 +1021,7 @@ struct monst * mon;
 				verbalize("You're such a %s; I wish...",
 					flags.female ? "sweet lady" : "nice guy");
 				/* unbind Enki. (unless you refused a demon lord) */
-				if (!is_ndemon(mon->data))
+				if (is_normal_demon(mon->data))
 					if(u.sealsActive&SEAL_ENKI) unbind(SEAL_ENKI,TRUE);
 			break;
 	}
@@ -2005,8 +2005,8 @@ int effect_num;
 			break;
 		case SEDU_PUNISH:
 			punish((struct obj *)0);
-			punish((struct obj *)0);
-			punish((struct obj *)0);
+			if(Punished)
+				uball->owt = min(uball->owt+320, 1600);
 			verbalize("Stay here.");
 			break;
 		case SEDU_JEALOUS:
@@ -2327,15 +2327,16 @@ int *result;
 	int nitems = 0;
 	boolean goatspawn = (magr->data->mtyp == PM_SMALL_GOAT_SPAWN || magr->data->mtyp == PM_GOAT_SPAWN || magr->data->mtyp == PM_GIANT_GOAT_SPAWN || magr->data->mtyp == PM_BLESSED);
 	boolean noflee = (magr->isshk && magr->mpeaceful);
+	boolean mi_only = is_chuul(magr->data);
 	if(attk->adtyp == AD_SITM){
 		/* select item from defender's inventory */
 		for (otmp = mdef->minvent; otmp; otmp = otmp->nobj)
-			if ((!magr->mtame || !otmp->cursed) && !(otmp->owornmask&equipmentmask))
+			if ((!magr->mtame || !otmp->cursed) && !(otmp->owornmask&equipmentmask) && (!mi_only || is_magic_obj(otmp)))
 				nitems++;
 		if(nitems){
 			nitems = rnd(nitems);
 			for (otmp = mdef->minvent; otmp; otmp = otmp->nobj)
-				if ((!magr->mtame || !otmp->cursed) && !(otmp->owornmask&equipmentmask))
+				if ((!magr->mtame || !otmp->cursed) && !(otmp->owornmask&equipmentmask) && (!mi_only || is_magic_obj(otmp)))
 					if(--nitems <= 0)
 						break;
 		}

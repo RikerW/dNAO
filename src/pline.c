@@ -583,6 +583,7 @@ register struct monst *mtmp;
 	if (mtmp->mconf)	  Strcat(info, ", confused");
 	if (mtmp->mcrazed)	  Strcat(info, ", crazed");
 	if (mtmp->mberserk)	  Strcat(info, ", berserk");
+	if (mon_healing_penalty(mtmp))	  Strcat(info, ", itchy");
 	if (mtmp->mblinded || !mtmp->mcansee)
 				  Strcat(info, ", blind");
 	else if(is_blind(mtmp)) Strcat(info, ", dazzled");
@@ -673,7 +674,7 @@ ustatusline()
 	}
 	if (Stunned)		Strcat(info, ", stunned");
 	if (u.ustdy > 0)	  Sprintf(eos(info), ", weakened (%d)", u.ustdy);
-	if (u.uencouraged > 0)	  Sprintf(eos(info), ", morale (%d)", u.uencouraged);
+	if (u.uencouraged != 0)	  Sprintf(eos(info), ", morale (%d)", u.uencouraged);
 #ifdef STEED
 	if (!u.usteed)
 #endif

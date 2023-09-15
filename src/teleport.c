@@ -67,14 +67,15 @@ unsigned gpflags;
 			if(mtmp == &youmonst && level.flags.lethe)
 				return FALSE;
 			if (mtmp == &youmonst)
-				return !!(Breathless);	/* not Amphibious -- teleporting into 3Dwater with limited breath can be very dangerous */
+				/* not Amphibious -- teleporting into 3Dwater with limited breath can be very dangerous */
+				return !!(Breathless && Waterproof && !(u.sealsActive&SEAL_OSE));
 			else return (mon_resistance(mtmp,SWIMMING) || breathless_mon(mtmp) || amphibious_mon(mtmp));
 	    } else if (is_pool(x,y, FALSE) && !ignorewater) {
 			if(mtmp == &youmonst && level.flags.lethe)
 				return !!(Levitation || Flying || Wwalking);
 			if (mtmp == &youmonst)
 				return !!(Levitation || Flying || Wwalking ||
-						Swimming || Amphibious);
+						((Swimming || Amphibious) && Waterproof && !(u.sealsActive&SEAL_OSE)));
 			else	return (mon_resistance(mtmp,FLYING) || breathless_mon(mtmp) || mon_resistance(mtmp,SWIMMING) ||
 								is_clinger(mdat) || amphibious_mon(mtmp));
 	    } else if (mdat->mlet == S_EEL && !ignorewater && rn2(13)) {
@@ -91,6 +92,12 @@ unsigned gpflags;
 	}
 	if (!ACCESSIBLE(levl[x][y].typ)) {
 		if (!(is_pool(x,y, FALSE) && ignorewater)) return FALSE;
+	}
+	if(In_quest(&u.uz) && urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH && levl[x][y].typ == AIR){
+		if(mtmp){
+			return mtmp == &youmonst ? (Flying || Levitation) : (mon_resistance(mtmp,FLYING) || mon_resistance(mtmp,LEVITATION));
+		}
+		else return FALSE;
 	}
 
 	if (closed_door(x, y) && (!mdat || !amorphous(mdat)))
@@ -676,7 +683,7 @@ boolean force_it;
 	return TRUE;
 }
 
-void
+boolean
 tele()
 {
 	coord cc;
@@ -687,7 +694,7 @@ tele()
 		if (!wizard) {
 #endif
 		    pline("A mysterious force prevents you from teleporting!");
-		    return;
+		    return TRUE;
 #ifdef WIZARD
 		}
 #endif
@@ -711,7 +718,7 @@ tele()
 	{
 		You_feel("disoriented for a moment.");
 		(void) safe_teleds(FALSE);/*teleportation still functions as an escape*/
-		return;
+		return TRUE;
 	}
 	if ((Teleport_control && !Stunned)
 #ifdef WIZARD
@@ -733,18 +740,19 @@ tele()
 		    cc.x = u.ux;
 		    cc.y = u.uy;
 		    if (getpos(&cc, TRUE, "the desired position") < 0)
-			return;	/* abort */
+			return FALSE;	/* abort */
 		    /* possible extensions: introduce a small error if
 		       magic power is low; allow transfer to solid rock */
 		    if (teleok(cc.x, cc.y, FALSE)) {
 			teleds(cc.x, cc.y, FALSE);
-			return;
+			return TRUE;
 		    }
 		    pline("Sorry...");
 		}
 	}
 
 	(void) safe_teleds(FALSE);
+	return TRUE;
 }
 
 int
@@ -855,7 +863,7 @@ dotele()
 }
 
 
-void
+boolean
 level_tele()
 {
 	register int newlev;
@@ -872,7 +880,7 @@ level_tele()
 #endif
 							) {
 	    You_feel("very disoriented for a moment.");
-	    return;
+	    return TRUE;
 	}
 	if ((Teleport_control && !Stunned)
 #ifdef WIZARD
@@ -893,11 +901,7 @@ level_tele()
 		}
 		getlin(qbuf, buf);
 		if (!strcmp(buf,"\033")) {	/* cancelled */
-			if (Confusion && rnl(100) >= 20) {
-			pline("Oops...");
-			goto random_levtport;
-			}
-			return;
+			return FALSE;
 		} else if (!strcmp(buf,"*")) {
 			goto random_levtport;
 		} else if (Confusion && rnl(100) >= 20) {
@@ -928,7 +932,7 @@ level_tele()
 				pline("%s.", buf);
 			}
 			force_dest = TRUE;
-		    } else return;
+		    } else return TRUE;
 		} else
 #endif
 		if ((newlev = lev_by_name(buf)) == 0) newlev = atoi(buf);
@@ -940,7 +944,7 @@ level_tele()
 	    if (newlev == 0 && !force_dest) {
 			if (trycnt >= 10)
 				goto random_levtport;
-			if (ynq("Go to Nowhere.  Are you sure?") != 'y') return;
+			if (ynq("Go to Nowhere.  Are you sure?") != 'y') return FALSE;
 			You("%s in agony as your body begins to warp...",
 				is_silent(youracedata) ? "writhe" : "scream");
 			display_nhwindow(WIN_MESSAGE, FALSE);
@@ -953,7 +957,7 @@ level_tele()
 			pline("An energized cloud of dust begins to coalesce.");
 			Your("body rematerializes%s.", invent ?
 				", and you gather up all your possessions" : "");
-			return;
+			return TRUE;
 	    }
 
 	    /* if in Knox and the requested level > 0, stay put.
@@ -961,7 +965,7 @@ level_tele()
 	     */
 	    if (!force_dest && Is_knox(&u.uz) && newlev > 0) {
 			You1(shudder_for_moment);
-			return;
+			return TRUE;
 	    }
 	    /* if in Quest, the player sees "Home 1", etc., on the status
 	     * line, instead of the logical depth of the level.  controlled
@@ -1027,13 +1031,13 @@ level_tele()
 	    if (newlev == depth(&u.uz)) {
 			tele();
 			You1(shudder_for_moment);
-			return;
+			return TRUE;
 	    }
 	}
 
 	if (!next_to_u()) {
 		You1(shudder_for_moment);
-		return;
+		return TRUE;
 	}
 #ifdef WIZARD
 	if (In_endgame(&u.uz)) {	/* must already be wizard */
@@ -1041,12 +1045,12 @@ level_tele()
 
 	    if (newlev >= 0 || newlev <= -llimit || (force_dest && newlevel.dnum != u.uz.dnum)) {
 			You_cant("get there from here.");
-			return;
+			return TRUE;
 	    }
 	    newlevel.dnum = u.uz.dnum;
 	    newlevel.dlevel = llimit + newlev;
-	    schedule_goto(&newlevel, FALSE, FALSE, 0, (char *)0, (char *)0);
-	    return;
+	    schedule_goto(&newlevel, FALSE, FALSE, 0, (char *)0, (char *)0, 0, 0);
+	    return TRUE;
 	}
 #endif
 
@@ -1157,10 +1161,73 @@ level_tele()
 #endif
 	    get_level(&newlevel, newlev);
 	}
-	schedule_goto(&newlevel, FALSE, FALSE, 0, (char *)0, (char *)0);
+	schedule_goto(&newlevel, FALSE, FALSE, 0, (char *)0, (char *)0, 0, 0);
 	/* in case player just read a scroll and is about to be asked to
 	   call it something, we can't defer until the end of the turn */
 	if (u.utotype && !flags.mon_moving) deferred_goto();
+	return TRUE;
+}
+
+boolean
+branch_tele()
+{
+	int i, num_ok_dungeons, last_ok_dungeon = 0;
+	d_level newlev;
+	extern int n_dgns; /* from dungeon.c */
+	winid tmpwin = create_nhwindow(NHW_MENU);
+	anything any;
+
+	any.a_void = 0;	/* set all bits to zero */
+	start_menu(tmpwin);
+	/* use index+1 (cant use 0) as identifier */
+	for (i = num_ok_dungeons = 0; i < n_dgns; i++) {
+	if (!dungeons[i].dunlev_ureached) continue;
+	any.a_int = i+1;
+	add_menu(tmpwin, NO_GLYPH, &any, 0, 0, ATR_NONE,
+		 dungeons[i].dname, MENU_UNSELECTED);
+	num_ok_dungeons++;
+	last_ok_dungeon = i;
+	}
+	end_menu(tmpwin, "Open a portal to which dungeon?");
+	if (num_ok_dungeons > 1) {
+	/* more than one entry; display menu for choices */
+	menu_item *selected;
+	int n;
+
+	n = select_menu(tmpwin, PICK_ONE, &selected);
+	if (n <= 0) {
+		destroy_nhwindow(tmpwin);
+		return FALSE;
+	}
+	i = selected[0].item.a_int - 1;
+	free((genericptr_t)selected);
+	} else
+	i = last_ok_dungeon;	/* also first & only OK dungeon */
+	destroy_nhwindow(tmpwin);
+
+	/*
+	 * i is now index into dungeon structure for the new dungeon.
+	 * Find the closest level in the given dungeon, open
+	 * a use-once portal to that dungeon and go there.
+	 * The closest level is either the entry or dunlev_ureached.
+	 */
+	newlev.dnum = i;
+	if(dungeons[i].depth_start >= depth(&u.uz))
+	newlev.dlevel = dungeons[i].entry_lev;
+	else
+	newlev.dlevel = dungeons[i].dunlev_ureached;
+	if(u.uhave.amulet || In_endgame(&u.uz) || In_endgame(&newlev) ||
+	   newlev.dnum == u.uz.dnum) {
+	You_feel("very disoriented for a moment.");
+	} else {
+	if(u.usteed && mon_has_amulet(u.usteed)){
+		dismount_steed(DISMOUNT_VANISHED);
+	}
+	if(!Blind) You("are surrounded by a shimmering sphere!");
+	else You_feel("weightless for a moment.");
+	goto_level(&newlev, FALSE, FALSE, FALSE);
+	}
+	return TRUE;
 }
 
 void
@@ -1211,12 +1278,22 @@ register struct trap *ttmp;
 		schedule_goto(&target_level, FALSE, FALSE, painting,
 				  painting ? "You find yourself next to a scrap of canvas." :
 				  "You feel dizzy for a moment, but the sensation passes.",
-				  (char *)0);
+				  (char *)0, 0, 0);
 	} else {
 		target_level = ttmp->dst;
 		schedule_goto(&target_level, FALSE, FALSE, TRUE,
 				  "You feel dizzy for a moment, but the sensation passes.",
-				  (char *)0);
+				  (char *)0, 0, 0);
+	}
+	if(ttmp && ttmp->special){
+		/*With appologies to "Through the Gates of the Silver Key" by H. P. Lovecraft. */
+		pline("You have paused in your travels for a time, in a strange place where place and time have no meaning.");
+		pline("There is no distinction between your past and present selves, just as there is no distinction between your future and present. There is only the immutable %s.", plname);
+		pline("Light filters down from a sky of no color in baffling, contradictory directions, and plays almost sentiently over a line of gigantic hexagonal pedestals.");
+		pline("Surmounting these pedestals are cloaked, ill-defined Shapes, and another Shape, too, which occupies no pedestal.");
+		pline("It speaks to you without sound or language, and you find yourself at your destination!");
+		pline("A seal is engraved into your mind!");
+		u.specialSealsKnown |= SEAL_YOG_SOTHOTH;
 	}
 }
 
@@ -1232,10 +1309,22 @@ struct trap *trap;
 		You1(shudder_for_moment);
 	} else if (trap->once) {
 		deltrap(trap);
+		trap = 0;
 		newsym(u.ux,u.uy);	/* get rid of trap symbol */
 		vault_tele();
 	} else
 		tele();
+
+	if(trap && trap->special){
+		/*With appologies to "Through the Gates of the Silver Key" by H. P. Lovecraft. */
+		pline("You have paused in your travels for a time, in a strange place where place and time have no meaning.");
+		pline("There is no distinction between your past and present selves, just as there is no distinction between your future and present. There is only the immutable %s.", plname);
+		pline("Light filters down from a sky of no color in baffling, contradictory directions, and plays almost sentiently over a line of gigantic hexagonal pedestals.");
+		pline("Surmounting these pedestals are cloaked, ill-defined Shapes, and another Shape, too, which occupies no pedestal.");
+		pline("It speaks to you without sound or language, and you find yourself at your destination!");
+		pline("A seal is engraved into your mind!");
+		u.specialSealsKnown |= SEAL_YOG_SOTHOTH;
+	}
 }
 
 void
@@ -1256,6 +1345,18 @@ struct trap *trap;
 	    You("are momentarily blinded by a flash of light.");
 	else
 	    You("are momentarily disoriented.");
+
+	if(trap && trap->special){
+		/*With appologies to "Through the Gates of the Silver Key" by H. P. Lovecraft. */
+		pline("You have paused in your travels for a time, in a strange place where place and time have no meaning.");
+		pline("There is no distinction between your past and present selves, just as there is no distinction between your future and present. There is only the immutable %s.", plname);
+		pline("Light filters down from a sky of no color in baffling, contradictory directions, and plays almost sentiently over a line of gigantic hexagonal pedestals.");
+		pline("Surmounting these pedestals are cloaked, ill-defined Shapes, and another Shape, too, which occupies no pedestal.");
+		pline("It speaks to you without sound or language, and you find yourself at your destination!");
+		pline("A seal is engraved into your mind!");
+		u.specialSealsKnown |= SEAL_YOG_SOTHOTH;
+	}
+
 	deltrap(trap);
 	newsym(u.ux,u.uy);	/* get rid of trap symbol */
 	level_tele();
@@ -1581,12 +1682,8 @@ int x, y;
 
 void
 rloco(obj)
-register struct obj *obj;
+struct obj *obj;
 {
-	register xchar tx, ty, otx, oty;
-	boolean restricted_fall;
-	int try_limit = 4000;
-
 	if (obj->otyp == CORPSE && is_rider(&mons[obj->corpsenm])) {
 	    if (revive_corpse(obj, REVIVE_MONSTER)) return;
 	}
@@ -1594,6 +1691,21 @@ register struct obj *obj;
 		return;
 
 	obj_extract_self(obj);
+	randomly_place_obj(obj);
+}
+
+void
+randomly_place_obj(obj)
+struct obj *obj;
+{
+	xchar tx, ty, otx, oty;
+	boolean restricted_fall;
+	int try_limit = 4000;
+
+	if(obj->where != OBJ_FREE){
+		impossible("obj not free in randomly_place_obj! (no action taken)");
+		return;
+	}
 	otx = obj->ox;
 	oty = obj->oy;
 	restricted_fall = (otx == 0 && dndest.lx);

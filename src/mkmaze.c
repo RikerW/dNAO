@@ -586,6 +586,10 @@ fixup_special()
 			place_chaos_forest_features();
 		}
 	}
+	/*Elf huts on elf shared home*/
+	if(In_quest(&u.uz) && urole.neminum == PM_NECROMANCER){
+		place_elfquest_forest_features();
+	}
 	/* NEUTRAL QUEST: various features */
 	if (In_outlands(&u.uz)){
 		if (!(u.uz.dlevel == spire_level.dlevel || Is_gatetown(&u.uz) || Is_sumall(&u.uz)))
@@ -709,7 +713,44 @@ fixup_special()
 				break;
 		}
 		if(chest) for(mon = fmon; mon; mon = mon->nmon){
-			if(mon->entangled != SHACKLES)
+			if(mon->entangled_otyp != SHACKLES)
+				continue;
+			for(obj = mon->minvent; obj; obj = nobj){
+				nobj = obj->nobj;
+				if(obj->otyp == SHACKLES)
+					continue;
+				mon->misc_worn_check &= ~obj->owornmask;
+				update_mon_intrinsics(mon, obj, FALSE, FALSE);
+				if (obj->owornmask & W_WEP){
+					setmnotwielded(mon,obj);
+					MON_NOWEP(mon);
+				}
+				if (obj->owornmask & W_SWAPWEP){
+					setmnotwielded(mon,obj);
+					MON_NOSWEP(mon);
+				}
+				obj->owornmask = 0L;
+				obj_extract_self(obj);
+				add_to_container(chest, obj);
+			}
+		}
+	}
+	/* DROW QUEST: transfer equip */
+	if (urole.neminum == PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH && In_quest(&u.uz)) {
+		if(qlocate_level.dlevel < u.uz.dlevel)
+			place_drow_healer_features();
+		struct obj *chest;
+		struct obj *obj, *nobj;
+		struct monst *mon;
+		int ctyp = CHEST;
+		if(Is_nemesis(&u.uz))
+			ctyp = SACK;
+		for(chest = fobj; chest; chest = chest->nobj){
+			if(chest->otyp == ctyp)
+				break;
+		}
+		if(chest) for(mon = fmon; mon; mon = mon->nmon){
+			if(mon->entangled_otyp != SHACKLES)
 				continue;
 			for(obj = mon->minvent; obj; obj = nobj){
 				nobj = obj->nobj;
@@ -735,6 +776,40 @@ fixup_special()
 	if (Role_if(PM_PRIEST) && In_quest(&u.uz)) {
 		/* less chance for undead corpses (lured from lower morgues) */
 		level.flags.graveyard = 1;
+	}
+	/* HEALER QUEST: put some plague victims around the map */
+	if (Role_if(PM_HEALER) && In_quest(&u.uz)) {
+		if(!Race_if(PM_DROW)) {
+			int plague_types[] = {PM_HOBBIT, PM_DWARF, PM_BUGBEAR, PM_DWARF_LORD, PM_DWARF_CLERIC,
+				PM_DWARF_QUEEN, PM_DWARF_KING, PM_DEEP_ONE, PM_IMP, PM_QUASIT, PM_WINGED_KOBOLD,
+				PM_DRYAD, PM_NAIAD, PM_OREAD, PM_DEMINYMPH, PM_THRIAE, PM_HILL_ORC, PM_ORC_SHAMAN, 
+				PM_ORC_CAPTAIN, PM_JUSTICE_ARCHON,
+				PM_MOVANIC_DEVA, PM_LILLEND, PM_COURE_ELADRIN,
+				PM_CHIROPTERAN, PM_PLAINS_CENTAUR, PM_FOREST_CENTAUR, PM_MOUNTAIN_CENTAUR,
+				PM_DRIDER, PM_FORMIAN_CRUSHER, PM_FORMIAN_TASKMASTER, PM_MYRMIDON_HOPLITE,
+				PM_MYRMIDON_LOCHIAS, PM_MYRMIDON_YPOLOCHAGOS, PM_MYRMIDON_LOCHAGOS,
+				PM_GNOME, PM_GNOME_LORD, PM_GNOME_LADY, PM_TINKER_GNOME, PM_GNOME_KING, PM_GNOME_QUEEN,
+				PM_VAMPIRE, PM_VAMPIRE_LORD, PM_VAMPIRE_LADY,
+				PM_PEASANT, PM_PEASANT, PM_PEASANT, PM_PEASANT, PM_NURSE, PM_WATCHMAN, PM_WATCH_CAPTAIN, 
+				PM_WOODLAND_ELF, PM_GREEN_ELF, PM_GREY_ELF, PM_ELF_LORD, PM_ELF_LADY, PM_ELVENKING, PM_ELVENQUEEN,
+				PM_DROW_CAPTAIN, PM_HEDROW_WIZARD,
+				PM_HORNED_DEVIL, PM_SUCCUBUS, PM_INCUBUS,
+				PM_BARBARIAN, PM_HALF_DRAGON, PM_BARD, PM_HEALER, PM_RANGER, PM_VALKYRIE,
+				PM_SMALL_GOAT_SPAWN, PM_GOAT_SPAWN
+			};
+			int x, y, tries;
+			for(int i = d(2,4); i >0; i--){
+				tries = 10;
+				do {
+					x = rn2(COLNO)+1;
+					y = rn2(ROWNO);
+				}
+				while(!(isok(x,y) && levl[x][y].typ == SOIL) && tries-->0);
+				
+				if(isok(x,y) && levl[x][y].typ == SOIL)
+					makemon_full(&mons[ROLL_FROM(plague_types)], x, y, NO_MM_FLAGS, PLAGUE_TEMPLATE, -1);
+			}
+		}
 	}
 	/* KNIGHT QUEST: convert half the swamp to a forest on the knight locate level*/
 	if (Role_if(PM_KNIGHT) &&
@@ -1282,6 +1357,8 @@ int attempts;
 			/* probabilities here are deflated from makelevel() */
 			if (!rn2(20))
 				mkfeature(FOUNTAIN, FALSE, r);
+			if (!rn2(60))
+				mkfeature(FORGE, FALSE, r);
 			if (!rn2(80))
 				mkfeature(SINK, FALSE, r);
 			if (!rn2(100))
@@ -1360,9 +1437,26 @@ register const char *s;
 	if(*s) {
 	    if(sp && sp->rndlevs){
 			levvar = rnd((int) sp->rndlevs);
-			/* special case -- chalev should always use the corresponding level */
+			/* special cases -- 
+			 * chalev should always use the corresponding level
+			 * hell/abyss floors are set at game start for oracle sneak peeks
+			 * medusa & grue are still random as of right now, as is sea
+			*/
 			if (!strcmp(sp->proto, "chalev"))
 				levvar = chaos_dvariant + 1;
+			else if (Is_hell1(&u.uz))
+				levvar = dungeon_topology.hell1_variant;
+			else if (Is_hell2(&u.uz))
+				levvar = dungeon_topology.hell2_variant;
+			else if (Is_abyss1(&u.uz))
+				levvar = dungeon_topology.abyss_variant;
+			else if (Is_abyss2(&u.uz))
+				levvar = dungeon_topology.abys2_variant;
+			else if (Is_abyss3(&u.uz))
+				levvar = dungeon_topology.brine_variant;
+			
+			if (dungeon_topology.hell1_variant == CHROMA_LEVEL) levvar = BAEL_LEVEL;
+			
 			Sprintf(protofile, "%s-%d", s, levvar);
 		}
 	    else Strcpy(protofile, s);
@@ -1387,16 +1481,6 @@ register const char *s;
 //	pline("%d", levvar);
 	if (Is_challenge_level(&u.uz)){
 		dungeon_topology.challenge_variant = levvar;
-	} else if(Is_hell1(&u.uz)){
-		dungeon_topology.hell1_variant = levvar;
-	} else if(Is_hell2(&u.uz)){
-		dungeon_topology.hell2_variant = levvar;
-	} else if(Is_abyss1(&u.uz)){
-		dungeon_topology.abyss_variant = levvar;
-	} else if(Is_abyss2(&u.uz)){
-		dungeon_topology.abys2_variant = levvar;
-	} else if(Is_abyss3(&u.uz)){
-		dungeon_topology.brine_variant = levvar;
 	} else if(In_sea(&u.uz)){
 		dungeon_topology.sea_variant = levvar;
 	}
@@ -1409,8 +1493,9 @@ register const char *s;
 		} else if(Is_arcadiadonjon(&u.uz)){
 			Strcpy(protofile, "towrtob");
 		}
-	} 
-	if(Is_hell1(&u.uz) && !Role_if(PM_CAVEMAN) && dungeon_topology.hell1_variant == BAEL_LEVEL && rn2(2)){
+	}
+	
+	if(Is_hell1(&u.uz) && dungeon_topology.hell1_variant == CHROMA_LEVEL){
 			Strcpy(protofile, "hell-a");
 	}
 	/* quick hack for Binders entering Astral -- change the gods out before loading the level, so that
@@ -2399,7 +2484,7 @@ fill_dungeon_of_ill_regard(){
 					i++;\
 				}\
 				if(i < PM_LONG_WORM_TAIL){\
-					mon = makemon(&mons[i], x, y, NO_MINVENT|MM_IGNOREWATER);\
+					mon = makemon(&mons[i], x, y, NO_MINVENT|MM_IGNOREWATER|MM_NOGROUP);\
 					trap = maketrap(x, y, VIVI_TRAP);\
 					trap->tseen = TRUE;\
 					if(!mon) impossible("bad monster placement at %d, %d.", x, y);\
