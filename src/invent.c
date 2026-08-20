@@ -3156,6 +3156,7 @@ winid *datawin;
 					case AD_HLUH: Strcat(buf, "corrupted holy damage"); break;
 					case AD_STAR: Strcat(buf, "silver damage"); break;
 					case AD_SLEE: Strcat(buf, "sleep damage"); break;
+					case AD_CONF: Strcat(buf, "confusing damage"); break;
 					case AD_PHYS: Strcat(buf, "damage"); break;
 					default: break;
 				}
@@ -4172,7 +4173,7 @@ winid *datawin;
 		* Expects ARM_SUIT = 0, all the way up to ARM_SHIRT = 6. */
 		if (!printed_type) {
 			const char* armorslots[] = {
-				"torso", "shield", "helm", "gloves", "boots", "cloak", "shirt", "belt"
+				"torso", "shield", "helm", "gloves", "boots", "cloak", "shirt", "belt", "wing"
 			};
 			if (obj) {
 				Sprintf(buf, "%s, worn in the %s slot.",
