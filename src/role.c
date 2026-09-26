@@ -545,7 +545,7 @@ struct Role roles[] = {
 	PM_PINDAR, PM_RHYMER, PM_AGLAOPE,
 	PM_SNAKE, PM_WHITE_UNICORN, S_SNAKE, S_UNICORN,
 	ART_LYRE_OF_ORPHEUS,
-	SA_HUMAN|SA_TIEFLING|SA_AASIMAR|SA_ELF|SA_GNOME|SA_ORC|SA_CLOCKWORK|SA_HALF_DRAGON|SA_YUKI_ONNA|SA_VAMPIRE|SA_CENTAUR, ROLE_MALE|ROLE_FEMALE |
+	SA_HUMAN|SA_TIEFLING|SA_AASIMAR|SA_ELF|SA_GNOME|SA_ORC|SA_CLOCKWORK|SA_HALF_DRAGON|SA_YUKI_ONNA|SA_VAMPIRE|SA_CENTAUR|SA_STOLEN, ROLE_MALE|ROLE_FEMALE |
 	  ROLE_NEUTRAL|ROLE_CHAOTIC,
 	/* Str Int Wis Dex Con Cha */
 	{   7,  7,  7, 10,  6, 10 },
@@ -1019,6 +1019,21 @@ const struct Race races[] = {
 	{  2, 0,  3, 0,  3, 0 },	/* Energy */
 	NORMALNIGHTVIS,
 	SPE_CHARM_MONSTER, -15
+},
+{	"stolen", "stolen", "stolenkind", "Stn", 's',
+	{0, 0},
+	PM_STOLEN, NON_PM, PM_HUMAN_MUMMY, PM_STOLEN,
+	ROLE_MALE|ROLE_FEMALE | ROLE_NEUTRAL,
+	SA_STOLEN,
+	MA_FEY, 0, MA_ELF,
+	/* Str Int Wis Dex Con Cha */
+	{ 3,  3,  3,  3,  3,  3 },
+	{ 18, 16, 20, 20, 16, 18 },
+	/* Init   Lower  Higher */
+	{  2, 0,  0, 4,  1, 0 },	/* Hit points */
+	{  1, 0,  2, 0,  2, 0 },		/* Energy */
+	NORMALNIGHTVIS,
+	SPE_POISON_SPRAY, -15
 },
 {	"gith", "gith", "githhood", "Gth", 'G',
 	{0, 0},
@@ -2579,7 +2594,43 @@ int newgame;
 		urole.enemy2num = PM_LARGE_KOBOLD;
 		urole.enemy1sym = S_IMP;
 		urole.enemy2sym = S_KOBOLD;
+	} else if (Race_if(PM_STOLEN) && (Role_if(PM_BARD)) ) {
+		flags.racial_pantheon = PM_STOLEN;
+		//urole.filecode = "Stn";
+		
+		urole.homebase = "the forgotten swamp";
+		urole.intermed = "ruined village";
+		urole.questarti = ART_MOTHER_S_SCISSORS;
+		
+		urole.lgod = GOD_MARZANNA;
+		urole.ngod = GOD_VELES;
+		urole.cgod = GOD_ZEVANA;
+		urole.vgod = GOD_CZARNOBOG;
+		
+		urole.enemy1num = PM_SWAMP_FERN;
+		urole.enemy2num = PM_FOGLET;
+		urole.enemy1sym = S_FUNGUS;
+		urole.enemy2sym = S_GREMLIN;
 	// } else if ((Race_if(PM_ORC) || Pantheon_if(PM_ORC)) && (Role_if(PM_RANGER)) ) {
+		// flags.racial_pantheon = PM_ORC;
+		// urole.filecode = "Ror";
+		
+		// urole.homebase = "";
+		// urole.intermed = "";
+		// urole.questarti = 0;/*Determined by first loot you obtain*/
+		
+		// urole.ldrnum = PM_ORC_WARCHIEF;
+		// urole.guardnum = PM_ORC_WARRIOR;
+		// urole.neminum = 0;/*Determined by first loot you obtain*/
+		
+		// urole.lgod = OrcLgod;
+		// urole.ngod = OrcNgod;
+		// urole.cgod = OrcCgod;
+		
+		// urole.enemy1num = PM_WOLF;
+		// urole.enemy2num = PM_MASTODON;
+		// urole.enemy1sym = S_QUADRUPED;
+		// urole.enemy2sym = S_LAW_ANGEL;
 		// flags.racial_pantheon = PM_ORC;
 		// urole.filecode = "Ror";
 		

@@ -246,6 +246,10 @@
 #define EGokorei		u.uprops[DIAMOND_BELL].extrinsic
 #define Gokorei		(HGokorei || EGokorei)
 
+#define HFatedShears		u.uprops[FATED_SHEARS].intrinsic
+#define EFatedShears		u.uprops[FATED_SHEARS].extrinsic
+#define FatedShears		(HFatedShears || EFatedShears)
+
 #define HQuickDraw		u.uprops[QUICK_DRAW].intrinsic
 #define EQuickDraw		u.uprops[QUICK_DRAW].extrinsic
 #define QuickDraw		(HQuickDraw || EQuickDraw)

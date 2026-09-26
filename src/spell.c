@@ -6322,6 +6322,9 @@ int spell;
 	
 	if(Race_if(PM_INCANTIFIER))
 		splcaster += max(-3*urole.spelarmr,urole.spelsbon);
+	
+	if (Race_if(PM_STOLEN))
+		splcaster += (uarmf) ? urole.spelarmr : -urole.spelarmr;
 
 	if(spellid(spell) == urole.spelspec || spellid(spell) == further_study(urole.spelspec))
 		splcaster += urole.spelsbon;

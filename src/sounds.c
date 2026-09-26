@@ -3043,7 +3043,7 @@ int dz;
     register int tx,ty,bindresult;
     struct obj *otmp;
 	
-    if (is_silent(youracedata)) {
+    if (is_silent(youracedata) && !(Race_if(PM_STOLEN) && quest_status.touched_artifact)) {
 		pline("As %s, you cannot speak.", an(youracedata->mname));
 		return MOVE_CANCELLED;
     }

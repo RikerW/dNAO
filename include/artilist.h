@@ -2927,6 +2927,17 @@ A("Great Claws of Urdlen",			GAUNTLETS_OF_POWER,	"clawed %s",
 	PROPS(), NOFLAG,
 	QUAKE, (ARTI_PLUSSEV|ARTI_DIG)
 	),
+
+/*Needs encyc entry*/
+A("Mother's Scissors",		PAIR_OF_SCISSORS,			(const char *)0,
+	4000L, IRON, MZ_DEFAULT, 0,
+	A_CHAOTIC, PM_BARD, PM_STOLEN, TIER_B, (ARTG_NOGEN|ARTG_NOWISH|ARTG_MAJOR),
+	NO_MONS(),
+	NO_ATTK(), NOFLAG,
+	PROPS(), NOFLAG,
+	PROPS(ANTIMAGIC, FATED_SHEARS), NOFLAG,
+	TAMING, NOFLAG
+	),
 	
 /*Needs encyc entry*/
 A("The Moonbow of Sehanine",		ELVEN_BOW,			(const char *)0,

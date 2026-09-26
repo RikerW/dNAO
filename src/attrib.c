@@ -296,6 +296,11 @@ const struct innate {
 		     {	 0, 0, 0, 0 } },
 
 	cen_abil[] = { {	14, &(HJumping), "you feel light on your feet", "you feel heavier" },
+		     {	 0, 0, 0, 0 } },
+
+	stn_abil[] = {
+			 {	 1, &(HPoison_resistance), "", "" },
+			 {	 1, &(HWarning), "", "" },
 		     {	 0, 0, 0, 0 } };
 
 #define	next_check u.exerchkturn
@@ -1017,6 +1022,7 @@ int oldlevel, newlevel;
 	case PM_DARK_FEY_RI:	rabil = tief_drow_abil;	break;
 	case PM_DOKKIMAR:		rabil = aasi_drow_abil;	break;
 	case PM_TIEFLING:		rabil = tief_abil;	break;
+	case PM_STOLEN:			rabil = stn_abil;	break;
 	case PM_AASIMAR:
 		if(flags.aasimar_type == AASIMAR_TYPE_ARCHON || flags.aasimar_type == AASIMAR_TYPE_SERAPH)
 			rabil = aasi_archon_abil;

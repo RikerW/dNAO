@@ -4807,6 +4807,7 @@ winid *datawin;
 		check_oprop(obj, OPROP_BCRS) ||
 		check_oprop(obj, OPROP_CGLZ) ||
 		oartifact == ART_HELPING_HAND ||
+		oartifact == ART_MOTHER_S_SCISSORS ||
 		oartifact == ART_STAFF_OF_NECROMANCY ||
 		oartifact == ART_TREASURY_OF_PROTEUS ||
 		oartifact == ART_TENTACLE_ROD ||

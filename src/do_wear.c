@@ -2614,6 +2614,8 @@ struct obj * otmp;
 		//Full spe bonus to AC on top of normal 1/2 bonus.
 		if(otmp->otyp == IMPERIAL_ELVEN_ARMOR && check_imp_mod(otmp, IEA_DEFLECTION))
 			def += otmp->spe;
+	} else if (Race_if(PM_STOLEN) && otmp->spe == 0){
+		def += 3; // stolen get +3 AC from _unenchanted_ armor (no DR bonus)
 	}
 
 	// artifact bonus def
@@ -2823,7 +2825,7 @@ base_uac()
 {
 	int dexbonus = 0;
 	int uac = 10;
-	boolean flat_foot = multi < 0 || mad_turn(MAD_SUICIDAL) || u.ustuck;
+	boolean flat_foot = multi < 0 || mad_turn(MAD_SUICIDAL) || u.ustuck || (Race_if(PM_STOLEN) && uarmf);
 	
 	if(Upolyd){
 		uac -= youracedata->nac;
@@ -2980,7 +2982,7 @@ base_uac()
 	)
 		uac -= 8;
 	if(u.specialSealsActive&SEAL_UNKNOWN_GOD && uwep && uwep->oartifact == ART_PEN_OF_THE_VOID) uac -= 2*weapon_spe;
-	if(multi < 0 || mad_turn(MAD_SUICIDAL) || u.ustuck){
+	if(multi < 0 || mad_turn(MAD_SUICIDAL) || u.ustuck || (Race_if(PM_STOLEN) && uarmf)){
 		dexbonus = -5;
 	} else {
 		dexbonus += (int)( (ACURR(A_DEX)-11)/2 ); /*ranges from -5 to +7 (1 to 25) */

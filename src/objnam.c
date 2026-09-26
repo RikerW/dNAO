@@ -3874,7 +3874,8 @@ const char *oldstr;
 			   !BSTRCMPI(bp, p-16, "descent of stars") ||
 			   !BSTRCMPI(bp, p-13, "dragon scales") ||
 			   !BSTRCMPI(bp, p-11, "sarcophagus") ||
-			   !BSTRCMPI(bp, p-6, "fungus"))
+			   !BSTRCMPI(bp, p-6, "fungus") ||
+			   !BSTRCMPI(bp, p-8, "scissors"))
 				return bp;
 	mins:
 		p[-1] = '\0';
@@ -5211,7 +5212,7 @@ int wishflags;
 	-- boots, gloves, and lenses -- are also not mergable, so cnt is
 	ignored anyway.
 	*/
-	if(!strncmpi(bp, "pair of ",8)) {
+	if(!strncmpi(bp, "pair of ",8) && strncmpi(bp, "pair of scissors", 16)) {
 		bp += 8;
 		cnt *= 2;
 	} else if(cnt > 1 && !strncmpi(bp, "pairs of ",9)) {
@@ -5308,6 +5309,7 @@ int wishflags;
 	if (strncmpi(bp, "monk's staff", 10))
 	if (strncmpi(bp, "soldier's saber", 15))
 	if (strncmpi(bp, "soldier's rapier", 16))
+	if (strncmpi(bp, "mother's scissors", 17)) /* not the "mother" monster */
 	if (strncmpi(bp, "silverknight sword", 18)) /*not the epynonomous monster */
 	if (strncmpi(bp, "silverknight scythe", 19)) /*not the epynonomous monster */
 	if (strncmpi(bp, "silverknight spear", 18)) /*not the epynonomous monster */
@@ -5685,7 +5687,7 @@ srch:
 	if(!strncmpi(actualn, "sign of the scion queen mother", 30)\
 		||!strncmpi(actualn, "scion queen mother", 18)
 		||!strncmpi(actualn, "queen mother", 12)
-		||!strncmpi(actualn, "mother", 6)){
+		|| (!strncmpi(actualn, "mother", 6) && strncmpi(actualn, "mother's scissors", 17))){
 		queen = TRUE;
 		typ = SCR_WARD;
 		goto typfnd;

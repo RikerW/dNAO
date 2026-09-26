@@ -13102,8 +13102,10 @@ boolean verbose;
 					You_feel("something lend you some help!");
 				}
 				return TRUE;
-			}
-			else if(check_oprop(otmp, OPROP_BCRS) && otmp->owornmask){
+			} else if(otmp->oartifact == ART_MOTHER_S_SCISSORS){
+				if(verbose) You(mal_aura, the(xname(otmp)));
+				return TRUE;
+			} else if(check_oprop(otmp, OPROP_BCRS) && otmp->owornmask){
 				if(verbose) You(mal_aura, the(xname(otmp)));
 				return TRUE;
 			}
@@ -13194,6 +13196,11 @@ boolean verbose;
 			if(otmp->oartifact == ART_HELPING_HAND && (otmp->owornmask || rn2(20))){
 				if (visible && verbose)
 					You(mons_item_mal_aura, s_suffix(mon_nam(mon)), "helpful hand");
+				return TRUE;
+			}
+			if(otmp->oartifact == ART_MOTHER_S_SCISSORS){
+				if (visible && verbose)
+					You(mons_item_mal_aura, s_suffix(mon_nam(mon)), "fateful shears");
 				return TRUE;
 			}
 			else if(check_oprop(otmp, OPROP_BCRS) && otmp->owornmask){

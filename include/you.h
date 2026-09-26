@@ -141,6 +141,7 @@ struct Role {
 #define SA_SILVERMAN	0x00004000L
 #define SA_TIEFLING		0x00008000L
 #define SA_AASIMAR		0x00010000L
+#define SA_STOLEN		0x00020000L
 	short allow;		/* bit mask of allowed variations */
 #define ROLE_GENDMASK	0xf000		/* allowable genders */
 #define ROLE_MALE	0x1000

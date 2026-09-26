@@ -407,6 +407,19 @@ GOD_V2("_Velka, Goddess of Sin",           A_NEUTRAL, NEUTRAL_HOLINESS,
 GOD_V2("Manus, Father of the Abyss",       A_CHAOTIC, UNHOLY_HOLINESS,
 	MINIONS()
 	),
+/* Stolen */
+GOD_V2("Marzanna",	A_LAWFUL, NEUTRAL_HOLINESS,
+	MINIONS(Ldevils)
+	),
+GOD_V2("Veles",		A_NEUTRAL, NEUTRAL_HOLINESS,
+	MINIONS(NElemen)
+	),
+GOD_V2("Zevana",	A_CHAOTIC, NEUTRAL_HOLINESS,
+	MINIONS(Cdemons)
+	),
+GOD_V2("Czarnobog",	A_CHAOTIC, UNHOLY_HOLINESS,
+	MINIONS(Cdemons)
+	),
 /* orc noble */
 GOD_V2("Ilneval",                A_LAWFUL, UNHOLY_HOLINESS,
 	MINIONS()

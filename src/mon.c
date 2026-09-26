@@ -10648,13 +10648,8 @@ struct monst *mtmp;
 		/** Exhale: Static curses **/
 		if(damage){
 			struct	obj	*otmp;
-			for(otmp = invent; otmp; otmp=otmp->nobj)
-				if(otmp->oartifact == ART_HELPING_HAND)
-					break;
 			if(!mtmp->mtame && !mtmp->mpeaceful && distmin(u.ux,u.uy,mtmp->mx,mtmp->my) <= BOLT_LIM
-				&& (!Curse_res(&youmonst, FALSE) || !rn2(8))
-				&& !(otmp && rn2(20))
-				&& !(u.ukinghill && rn2(20))
+				&& (!Curse_res(&youmonst, FALSE) || !rn2(8)) // includes helping hand, proteus, etc.
 			){
 				if(canseemon(mtmp)){
 					pline("%s breathes out static curses.", Monnam(mtmp));
@@ -10676,7 +10671,7 @@ struct monst *mtmp;
 										Fast ? " a bit" : "");
 					} else{
 						if (!u.uconduct.killer){
-							//Pcifist PCs aren't combatants so if something kills them up "killed peaceful" type impurities
+							//Pacifist PCs aren't combatants so if something kills them up "killed peaceful" type impurities
 							IMPURITY_UP(u.uimp_murder)
 							IMPURITY_UP(u.uimp_bloodlust)
 						}
