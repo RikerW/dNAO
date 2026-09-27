@@ -488,10 +488,11 @@
 #define NEAN                   LUAHV+1
 #define NOOH                   NEAN+1
 #define UNMK                   NOOH+1
+#define SUMMON_CROWS           UNMK+1
 
 #define is_anti_syllable_spell(spell)	((spell) >= OWRK && (spell) <= UNMK)
 
-#define MON_LASTSPELL          UNMK
+#define MON_LASTSPELL          SUMMON_CROWS
 //Not yet implemented
 // #define MON_FIRE               STRANGLE+1
 // #define MON_BLIZZARD           MON_FIRAGA+1

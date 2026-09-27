@@ -12352,6 +12352,11 @@ boolean greatequip;
 			(void) mongets(mtmp, VICTORIAN_UNDERWEAR, mkobjflags);
 			(void) mongets(mtmp, LONG_GLOVES, mkobjflags);
 			(void) mongets(mtmp, STILETTOS, mkobjflags);
+		} else if(ptr->mtyp == PM_MAMUNA){
+			mtmp->m_lev = 14;
+			mtmp->mhp = mtmp->mhpmax = mtmp->m_lev*hd_size(mtmp->data) - 1;
+			(void) mongets(mtmp, POT_SICKNESS, mkobjflags);
+			(void) mongets(mtmp, POT_PARALYSIS, mkobjflags);
 		} else if(ptr->mtyp == PM_RAGE_WALKER){
 #define RAGE_WALKER_ITEM(otyp)	\
 			otmp = mksobj(otyp, NO_MKOBJ_FLAGS); \
@@ -18533,6 +18538,8 @@ peace_minded(struct monst *mon)
 		) return FALSE;
 
 	if(Role_if(PM_VALKYRIE) && (mndx==PM_CROW || mndx==PM_RAVEN)) return TRUE;
+
+	if(Race_if(PM_STOLEN) && (mon->data->mlet == S_NYMPH)) return TRUE;
 	
 	if(u.silver_atten && sflm_target_data(mon->data))
 		return FALSE;

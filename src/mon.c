@@ -4528,6 +4528,16 @@ plague_victim_on_level()
 }
 
 boolean
+mamuna_child_on_level()
+{
+	struct monst *mon;
+	for(mon = fmon; mon; mon = mon->nmon)
+		if(mamuna_child(mon)&& !mon->mpeaceful && !DEADMONSTER(mon))
+			return TRUE;
+	return FALSE;
+}
+
+boolean
 allied_iaso_on_level(mtmp)
 struct monst *mtmp;
 {
@@ -4664,7 +4674,8 @@ struct monst *mtmp;
 #define LSVD_KAM 0x00004000	/* kamerel becoming fractured */
 #define LSVD_ALA 0x00008000	/* alabaster decay */
 #define LSVD_FLS 0x00010000	/* God of flesh claims body */
-#define LSVDLAST LSVD_FLS	/* last lifesaver */
+#define LSVD_MAM 0x00020000	/* Mamuna incarnating */
+#define LSVDLAST LSVD_MAM	/* last lifesaver */
 
 	/* set to kill */
 	mtmp->mhp = 0;
@@ -4725,6 +4736,8 @@ struct monst *mtmp;
 		lifesavers |= LSVD_YEL;
 	if (mtmp->mtyp == PM_TWIN_SIBLING)
 		lifesavers |= LSVD_TWN;
+	if (mtmp->mtyp == PM_MAMUNA && mlev(mtmp) >= 8 && mamuna_child_on_level())
+		lifesavers |= LSVD_MAM;
 
 	/* some lifesavers do NOT work on stone/gold/glass-ing */
 	if (stoned || golded || glassed)
@@ -5085,6 +5098,17 @@ struct monst *mtmp;
 					mon_nam(mtmp));
 			}
 			mtmp->mvar_twin_lifesaved = TRUE;
+			break;
+		case LSVD_MAM:
+			/* message */
+			if (couldsee(mtmp->mx, mtmp->my)) {
+				messaged = TRUE;
+				mtmp->m_lev -= 2;
+				mtmp->mhpmax = max(mtmp->mhpmax - d(2, 8), 8);
+				mtmp->mhp = mtmp->mhpmax;
+				pline("%s collapses into a pile of rags and swamp water!", Monnam(mtmp));
+			}
+			mtmp->mvar_mamuna_lifesaved = TRUE;
 			break;
 		case LSVD_ILU:
 			/* normally has only a 1/3 chance of losing its lifesaving ability */
@@ -8837,6 +8861,7 @@ maybe_vanish(struct monst *mtmp)
 	  || (mtmp->mtyp == PM_STRANGER && !quest_status.touched_artifact)
 	  || ((mtmp->mtyp == PM_PUPPET_EMPEROR_XELETH || mtmp->mtyp == PM_PUPPET_EMPRESS_XEDALLI) && mtmp->mvar_yellow_lifesaved)
 	  || (mtmp->mtyp == PM_TWIN_SIBLING && (mtmp->mvar_twin_lifesaved || !(u.specialSealsActive&SEAL_YOG_SOTHOTH)))
+	  || (mtmp->mtyp == PM_MAMUNA && mtmp->mvar_mamuna_lifesaved)
 	){
 		if(!(mtmp->mtrapped && t_at(mtmp->mx, mtmp->my) && t_at(mtmp->mx, mtmp->my)->ttyp == VIVI_TRAP)){
 			if(mtmp->mtyp == PM_TRANSCENDENT_TETTIGON && mtmp->mvar1_tettigon_uncancel){

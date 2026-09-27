@@ -798,6 +798,23 @@
 							|| has_template(mon, FLAYED) \
 							)
 
+#define mamuna_child(mon) (\
+							   mon->data->mtyp == PM_SWAMP_NYMPH \
+							|| mon->data->mtyp == PM_DRYAD \
+							|| mon->data->mtyp == PM_NAIAD \
+							|| mon->data->mtyp == PM_OREAD \
+							|| mon->data->mtyp == PM_DEMINYMPH \
+							|| mon->data->mtyp == PM_LESHY \
+							|| mon->data->mtyp == PM_DROWNER \
+							|| mon->data->mtyp == PM_FOGLET \
+							|| mon->data->mtyp == PM_GREMLIN \
+							|| mon->data->mtyp == PM_SWAMP_FERN \
+							|| mon->data->mtyp == PM_ACID_BLOB \
+							|| mon->data->mtyp == PM_BROWN_PUDDING \
+							|| mon->data->mtyp == PM_BLACK_PUDDING \
+							|| mon->data->mtyp == PM_GELATINOUS_CUBE \
+							)
+
 #define gates_in_help(ptr)	((is_demon((ptr)) || is_minion((ptr))) \
 								&& !is_auton(ptr) \
 								&& !is_tiefling_mtyp((ptr)->mtyp) \

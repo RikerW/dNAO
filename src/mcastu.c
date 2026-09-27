@@ -53,7 +53,7 @@ boolean undirected;
 			You_feel("vexed.");
 		}
 	}
-	else if (canseemon(magr) && couldsee(magr->mx, magr->my)) {
+	else if (canseemon(magr) && couldsee(magr->mx, magr->my) && !is_silent_mon(magr)) {
 		const char *point_msg;  /* spellcasting monsters are impolite */
 
 		if (undirected)
@@ -717,6 +717,29 @@ choose_magic_special(struct monst *mtmp, struct monst *mdef, unsigned int type, 
 				return FILTH;
 			break;
 		}
+	break;
+	case PM_MAMUNA:
+	case PM_STOLEN: // fated shears
+		switch (rn2(7)){
+			case 0:
+				return EVIL_EYE;
+			case 1:
+				return CURSE_ITEMS;
+			case 2:
+				return PLAGUE;
+			case 3:
+				return (youagr) ? EVIL_EYE : SLIMIFY;
+			case 4:
+				return (youagr) ? EVIL_EYE : GREATER_DRAIN_ENERGY;
+			case 5:
+				return (youagr) ? EVIL_EYE : WEAKEN_STATS;
+			case 6:
+				return SUMMON_CROWS;
+
+		}
+	break;
+	case PM_LESHY:
+		return (!rn2(4)) ? SUMMON_CROWS : 0;
 	break;
 	case PM_STRANGER:
 		switch (clrc_spell_power % 18) {
@@ -6615,7 +6638,34 @@ int tary;
 			}
 		}
 		return MM_HIT;
-
+	case SUMMON_CROWS:{
+			int i = 0;
+			int n;
+			struct monst *mtmp;
+			int maketame = ((magr->mtame || youagr) ? MM_EDOG : 0);
+			int makesum = MM_ESUM;
+			for(n = max(4, (dmg+9)/10); n > 0; n--){
+				mtmp = makemon(&mons[PM_CROW], x(magr), y(magr), MM_ADJACENTOK|MM_ADJACENTSTRICT|maketame|makesum);
+				if (mtmp) {
+					/* time out */
+					if(makesum)
+						mark_mon_as_summoned(mtmp, magr, mlev(magr) + rnd(mlev(magr)), 0);
+					/* can be peaceful */
+					if(magr->mpeaceful)
+						mtmp->mpeaceful = TRUE;
+					/* can be tame */
+					if (maketame) {
+						initedog(mtmp);
+					}
+				}
+			}
+			if (mtmp) {
+				if (canseemon(mtmp)) {
+					pline("%s caws raucously!", Hallucination ? rndmonnam() : Amonnam(mtmp));
+				}
+			}
+		}
+		return MM_HIT;
 	case INSECTS:
 		if (!(tarx || tary)) {
 			impossible("summon insects with no target location");
@@ -8344,6 +8394,7 @@ int spellnum;
 	{
 	case SUMMON_SPHERE:
 	case SUMMON_ROGUE_HALOS:
+	case SUMMON_CROWS:
 	case INSECTS:
 	case RAISE_DEAD:
 	case SUMMON_MONS:

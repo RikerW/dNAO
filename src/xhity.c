@@ -3487,6 +3487,17 @@ int * tohitmod;					/* some attacks are made with decreased accuracy */
 		fromlist = FALSE;
 		add_subout(subout, SUBOUT_A_SUCK);
 	}
+	if (is_null_attk(attk) && youagr && Race_if(PM_STOLEN) && !uarmf && FatedShears && !by_the_book
+		&& !check_subout(subout, SUBOUT_SHEARS)
+	) {
+		attk->aatyp = AT_MAGC;
+		attk->adtyp = AD_CLRC;
+		attk->damn = 0;
+		attk->damd = 0;
+		fromlist = FALSE;
+		add_subout(subout, SUBOUT_SHEARS);
+	}
+
 	/* players can get a whole host of spirit attacks */
 	if (youagr && is_null_attk(attk) && !by_the_book) {
 		/* this assumes that getattk() will not be interrupted with youagr when already called with youagr */
@@ -14893,10 +14904,12 @@ int vis;
 		/* no effect on monsters */
 		//Use encouragement code to give monster target a -1
 		if (!youdef){
-			if(vis&VIS_MAGR){
+			if (youagr) {
+				pline("You glare ominously at %s!", mon_nam(mdef));
+			} else if(vis&VIS_MAGR){
 				pline("%s glares ominously at %s!", Monnam(magr), mon_nam(mdef));
 			}
-			mdef->encouraged = max(mdef->encouraged-1,-13);
+			mdef->encouraged = max(mdef->encouraged-dmg,-13);
 		}
 		else {
 			/* assumes you are defending */

@@ -54,6 +54,7 @@ STATIC_DCL void FDECL(goat_sacrifice, (struct monst *));
 STATIC_DCL void FDECL(palid_stranger, (struct monst *));
 STATIC_DCL void FDECL(sib_follow, (struct monst *));
 STATIC_DCL void FDECL(invisible_twin_act, (struct monst *));
+STATIC_DCL void FDECL(mamuna_resurrect, (struct monst *));
 void FDECL(make_rage_walker_polts, (int));
 void FDECL(make_generic_polts, (int));
 
@@ -1167,6 +1168,10 @@ you_regen_hp()
 			perX += 2*HEALCYCLE/3;
 		else if(*hp < (*hpmax)*.3)
 			perX += HEALCYCLE/3;
+	}
+	// Swamp-based regeneration
+	if(Race_if(PM_STOLEN) && !uarmf && (IS_SOIL(levl[u.ux][u.uy].typ) || IS_PUDDLE_OR_POOL(levl[u.ux][u.uy].typ))){
+		perX += u.ulevel*3; // HEALCYCLE at xp30
 	}
 
 	// "Natural" regeneration has stricter limitations
@@ -5683,6 +5688,8 @@ struct monst *mon;
 		sib_follow(mon);
 	else if(mon->mtyp == PM_TWIN_SIBLING)
 		invisible_twin_act(mon);
+	else if(mon->mtyp == PM_MAMUNA)
+		mamuna_resurrect(mon);
 	else if(mon->mux == u.uz.dnum && mon->muy == u.uz.dlevel && mon->mtyp == PM_MAMMON
 			&& mon->mvar_mammon_dive_x)
 		mammon_dive_progress(mon);
@@ -6741,6 +6748,93 @@ struct monst *mon;
 			}
 		}
 	}
+}
+
+STATIC_OVL
+void
+mamuna_resurrect(mon)
+struct monst *mon;
+{
+	struct monst *mtmp = 0;
+	struct monst *mtmp2 = 0;
+	struct monst *mtmp0 = 0;
+	struct monst *child = 0;
+	int rlocx, rlocy = 0;
+	//No resurrection while "alive"
+	if(!mon->mvar_mamuna_lifesaved)
+		return;
+
+	for (mtmp = fmon; mtmp; mtmp = mtmp->nmon){
+		if (mamuna_child(mtmp) && !mtmp->mpeaceful && !DEADMONSTER(mtmp)){
+			child = mtmp;
+			if (!rn2(3)) break;
+		}
+	}
+	if (child){
+		rlocx = child->mx;
+		rlocy = child->my;
+		if (couldsee(rlocx, rlocy)){
+			pline("%s suddenly swells and explodes with a shower of swampy water!", Monnam(child));
+			pline("Mamuna rises from the corpse of her child!");
+		}
+		mondied(child);
+		if (!DEADMONSTER(child)) return; // it lifesaved, it can live for a turn
+
+		for(mtmp = migrating_mons; mtmp; mtmp = mtmp2) {
+			mtmp2 = mtmp->nmon;
+			if (mtmp == mon) {
+				if(!mtmp0)
+					migrating_mons = mtmp->nmon;
+				else
+					mtmp0->nmon = mtmp->nmon;
+				mon_arrive(mtmp, FALSE);
+				break;
+			} else
+				mtmp0 = mtmp;
+		}
+		rloc_to(mtmp, rlocx, rlocy);
+		if(level.objects[mtmp->mx][mtmp->my] && !mtmp->menvy){
+			struct obj *cur;
+			struct obj *nobj;
+			for(cur = level.objects[mtmp->mx][mtmp->my]; cur; cur = nobj){
+				nobj = cur->nexthere;
+				/* Monsters don't pick up your ball and chain */
+				if(cur == uball || cur == uchain)
+					continue;
+
+				/* Monsters don't pick up bolted magic chests */
+				if(cur->otyp == MAGIC_CHEST && cur->obolted)
+					continue;
+
+				if(likes_obj(mtmp, cur) || can_equip(mtmp, cur)){
+					obj_extract_self(cur);
+					mpickobj(mtmp, cur);
+				}
+			}
+			m_dowear(mtmp, TRUE);
+			init_mon_wield_item(mtmp);
+			m_level_up_intrinsic(mtmp);
+		}
+	} else {
+		// possible if you kill the only other child with the same action (i.e. cleave/aoe)
+		for(mtmp = migrating_mons; mtmp; mtmp = mtmp2) {
+			mtmp2 = mtmp->nmon;
+			if (mtmp == mon) {
+				if(!mtmp0)
+					migrating_mons = mtmp->nmon;
+				else
+					mtmp0->nmon = mtmp->nmon;
+				mon_arrive(mtmp, FALSE);
+				break;
+			} else
+				mtmp0 = mtmp;
+		}
+		if (couldsee(mtmp->mx, mtmp->my)) {
+			pline("Mamuna reappears with a spray of murky water!");
+		}
+	}
+
+	mon->mvar_mamuna_lifesaved = FALSE;
 }
 
 void

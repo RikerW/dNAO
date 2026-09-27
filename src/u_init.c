@@ -207,6 +207,12 @@ static struct trobj Bard[] = {
 	{ WHISTLE, 0, TOOL_CLASS, 1, UNDEF_BLESS },
 	{ 0, 0, 0, 0, 0 }
 };
+static struct trobj Bard_Stn[] = {
+	{ FLUTE, UNDEF_SPE, TOOL_CLASS, 1, UNDEF_BLESS },
+	{ CLOAK, 1, ARMOR_CLASS, 1, UNDEF_BLESS },
+	{ APPLE, 0, FOOD_CLASS, 6, 0 },
+	{ 0, 0, 0, 0, 0 }
+};
 #endif
 static struct trobj Binder[] = {
 	{ SHEPHERD_S_CROOK, 0, WEAPON_CLASS, 1, 0 },
@@ -1295,6 +1301,16 @@ static const struct def_skill Skill_HD_Female[] = {
     { P_NONE, 0 }
 };
 
+static const struct def_skill Skill_Stolen[] = {
+    { P_BARE_HANDED_COMBAT, P_SKILLED }, { P_DAGGER, P_SKILLED },
+	{ P_KNIFE, P_EXPERT }, { P_WHIP, P_EXPERT },
+	{ P_CLUB, P_EXPERT }, { P_QUARTERSTAFF, P_SKILLED },
+	{ P_DART, P_SKILLED }, { P_HARVEST, P_EXPERT },
+	{ P_ENCHANTMENT_SPELL, P_EXPERT }, { P_ESCAPE_SPELL, P_BASIC },
+	{ P_CLERIC_SPELL, P_BASIC }, { P_MUSICALIZE, P_EXPERT },
+	{ P_BEAST_MASTERY, P_EXPERT }, { P_NONE, 0 }
+};
+
 static const struct def_skill Skill_G[] = {
     { P_PICK_AXE, P_EXPERT }, { P_CROSSBOW, P_EXPERT },
     { P_CLUB, P_EXPERT }, { P_NONE, 0 }
@@ -2268,11 +2284,15 @@ u_init()
 	case PM_BARD:
 		if (Race_if(PM_ORC)) Bard[BARD_INSTR].trotyp = (rn2(100) >= 50) ? BUGLE : TOOLED_HORN;
 		else if (Race_if(PM_HALF_DRAGON)) Bard[BARD_INSTR].trotyp = DRUM;
+		else if (Race_if(PM_STOLEN)) Bard[BARD_INSTR].trotyp = FLUTE;
 		else if (rn2(100) >= 50) Bard[BARD_INSTR].trotyp = FLUTE;
 		if (rn2(100) >= 85) Bard[BARD_WHISTLE].trotyp = BELL;
 		if (Race_if(PM_DROW)) Bard[BARD_CLOAK].trotyp = DROVEN_CHAIN_MAIL;
 		Bard[BARD_BOOZE].trquan = rn1(2, 5);
-		ini_inv(Bard);
+
+		if (Race_if(PM_STOLEN)) ini_inv(Bard_Stn);
+		else ini_inv(Bard);
+
 		if(RACE_IF_DROW){
 			BlackTorches[0].trquan = 6;
 			ini_inv(BlackTorches);
@@ -2296,9 +2316,12 @@ u_init()
 		know_random_obj(rn1(11,5));
 		/* Bards also know all the basic wards. */
 		u.wardsknown = WARD_ACHERON|WARD_HAMSA|WARD_ELDER_SIGN|WARD_EYE|WARD_QUEEN|WARD_CAT_LORD|WARD_GARUDA;
-		u.wardsknown |= WARD_TOUSTEFNA;
-		u.wardsknown |= WARD_DREPRUN;
-		skill_init(Skill_Bard);
+		u.wardsknown |= WARD_TOUSTEFNA|WARD_DREPRUN;
+		if (Race_if(PM_STOLEN)) {
+			skill_init(Skill_Stolen);
+			u.wardsknown |= WARD_VEIOISTAFUR|WARD_THJOFASTAFUR;
+		}
+		else skill_init(Skill_Bard);
 	break;
 #endif
 	case PM_EXILE:
@@ -3605,6 +3628,17 @@ register struct trobj *trop;
 				}
 				else if(obj->otyp == DROVEN_CLOAK){
 					obj->obj_color = CLR_BLUE;
+				}
+			}
+			if (Race_if(PM_STOLEN)){
+				if (obj->otyp == FLUTE) {
+					set_material_gm(obj, WOOD);
+					obj->oeroded2 = 1;
+				}
+				if (obj->otyp == CLOAK){
+					set_material_gm(obj, CLOTH);
+					obj->obj_color = CLR_BLACK;
+					obj->oeroded3 = 1;
 				}
 			}
 			if(obj->otyp == SLIME_MOLD && (RACE_IF_DROW)){

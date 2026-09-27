@@ -552,6 +552,9 @@ int know_spell;
 	if (instr->oartifact || instr_otyp == songs[song_id].instr2)
 		chance = (chance*3)/2;
 
+	if (Race_if(PM_STOLEN) && (instr_otyp == FLUTE && song_id == SNG_FEAR))
+		chance = (chance*3)/2;
+
 	// /* not easy to play 'peaceful' music when badly injured */
 	// if (u.uhp < u.uhpmax * 0.3 && 
 		// (song_id == SNG_SLEEP || song_id == SNG_TAME || song_id == SNG_HASTE || song_id == SNG_HEAL)
@@ -633,10 +636,14 @@ struct obj *instr;
 				if (spl_book[b].sp_id == songs[a].sp_id)
 					know_spell = TRUE;
 		
-		if (know_spell && (instr->oartifact == ART_LYRE_OF_ORPHEUS
-				   || instr_otyp == songs[a].instr1 || instr_otyp == songs[a].instr2)) {
+		if (know_spell
+		&& (instr->oartifact == ART_LYRE_OF_ORPHEUS || (Race_if(PM_STOLEN) && instr_otyp == FLUTE) || instr_otyp == songs[a].instr1 || instr_otyp == songs[a].instr2)
+		&& !(Race_if(PM_STOLEN) && (a == SNG_COURAGE || a == SNG_RLLY || a == SNG_HASTE || a == SNG_HEAL))
+		) {
 			any.a_int = a+1;
-			if (instr->oartifact == ART_LYRE_OF_ORPHEUS)
+			if (Race_if(PM_STOLEN) && (instr_otyp != FLUTE || a == SNG_TAME))
+				hardtoplay = '#';
+			else if (instr->oartifact == ART_LYRE_OF_ORPHEUS)
 				hardtoplay = (a == SNG_FEAR || a == SNG_COURAGE || a == SNG_CONFUSION || a == SNG_SLOW || a == SNG_CNCL ? ' ' : '#');
 			else
 				hardtoplay = (songs[a].instr1 == instr_otyp ? ' ' : '#');
@@ -717,7 +724,7 @@ struct obj * instr;
 		alev = 0;
 	}
 	// polymorphed into something that can't sing
-	if (is_silent(youracedata) && instr->otyp != DOLL_OF_FRIENDSHIP)
+	if (is_silent(youracedata) && instr->otyp != DOLL_OF_FRIENDSHIP && !(Race_if(PM_STOLEN) && quest_status.touched_artifact))
 		alev /= 2;
 	
 	
@@ -835,18 +842,21 @@ play_song()
 			break;
 		case SNG_CONFUSION:
 			confusion_song(distance);
+			if (Race_if(PM_STOLEN)) rally_song(distance*4);
 			break;
 		case SNG_SLOW:
 			slowness_song(distance);
 			break;
 		case SNG_HASTE:
 			haste_song(distance);
+			if (Race_if(PM_STOLEN)) slowness_song(distance);
 			break;
 		case SNG_HEAL:
 			heal_song(distance);
 			break;
 		case SNG_FEAR:
 			scary_song(distance);
+			if (Race_if(PM_STOLEN)) encourage_pets(distance);
 			break;
 		case SNG_COURAGE:
 			encourage_pets(distance);
@@ -856,6 +866,7 @@ play_song()
 			break;
 		case SNG_CNCL:
 			cancel_song(distance);
+			if (Race_if(PM_STOLEN)) heal_song(distance);
 			break;
 		case SNG_RLLY:
 			rally_song(distance*4);
@@ -2014,8 +2025,8 @@ struct obj *instr;
 	    You("can't play properly while wearing a shield.");
 		return 0;
 	}
-    if (is_silent(youracedata)){
-	    pline("While in this form, you can't sing along your songs.");
+    if (is_silent(youracedata) && !(Race_if(PM_STOLEN) && quest_status.touched_artifact)){
+	    pline("While in this form, you can't sing alongside your songs.");
 		return 0;
 	}
     

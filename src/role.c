@@ -1025,7 +1025,7 @@ const struct Race races[] = {
 	PM_STOLEN, NON_PM, PM_HUMAN_MUMMY, PM_STOLEN,
 	ROLE_MALE|ROLE_FEMALE | ROLE_NEUTRAL,
 	SA_STOLEN,
-	MA_FEY, 0, MA_ELF,
+	MA_FEY, MA_PLANT|MA_REPTILIAN, MA_HUMAN|MA_ELF|MA_DWARF|MA_GNOME|MA_ORC,
 	/* Str Int Wis Dex Con Cha */
 	{ 3,  3,  3,  3,  3,  3 },
 	{ 18, 16, 20, 20, 16, 18 },
