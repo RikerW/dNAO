@@ -65,7 +65,7 @@ const char *msg;
 	    (is_rider(&mons[otmp->corpsenm]) ||
 	     otmp->corpsenm == PM_WIZARD_OF_YENDOR)) {
 	    /* move any living monster already at that location */
-	    if((mtmp = m_at(x,y)) && enexto(&cc, x, y, mtmp->data))
+	    if((mtmp = m_at(x,y)) && enexto_mon(&cc, x, y, mtmp))
 		rloc_to(mtmp, cc.x, cc.y);
 	    if(msg) Norep("%s", msg);
 	    revived = revive_corpse(otmp, REVIVE_MONSTER);
@@ -76,7 +76,7 @@ const char *msg;
     if (revived) {
 	mtmp = m_at(x,y);
 	if (mtmp && !goodpos(x, y, mtmp, 0) &&
-	    enexto(&cc, x, y, mtmp->data)) {
+	    enexto_mon(&cc, x, y, mtmp)) {
 	    rloc_to(mtmp, cc.x, cc.y);
 	}
 	/* else impossible? */
@@ -899,10 +899,11 @@ boolean guess;
 		int x = travelstepx[set][i];
 		int y = travelstepy[set][i];
 		static int ordered[] = { 0, 2, 4, 6, 1, 3, 5, 7 };
-		/* no diagonal movement for grid bugs */
-		int dirmax = (u.umonnum == PM_GRID_BUG || u.umonnum == PM_BEBELITH) ? 4 : 8;
+		/* no diagonal movement for grid bugs; no orthogonal movement for sea people */
+		int dirmin = diagonal_mover(&youmonst) ? 4 : 0;
+		int dirmax = orthogonal_mover(&youmonst) ? 4 : 8;
 
-		for (dir = 0; dir < dirmax; ++dir) {
+		for (dir = dirmin; dir < dirmax; ++dir) {
 		    int nx = x+xdir[ordered[dir]];
 		    int ny = y+ydir[ordered[dir]];
 
@@ -2008,6 +2009,8 @@ domove()
 	    invocation_message();
 	}
 
+	update_proneness(&youmonst);
+
 	if (Punished){				/* put back ball and chain */
 	    move_bc(0,bc_control,ballx,bally,chainx,chainy);
 	}
@@ -2021,7 +2024,10 @@ domove()
 	/* delay next move because of ball dragging */
 	/* must come after we finished picking up, in spoteffects() */
 	if (cause_delay) {
-	    nomul(-2, "dragging an iron ball");
+	    char buf[BUFSZ];
+	    Sprintf(buf, "%s ball", material_name(uball, TRUE));
+	    Sprintf(buf, "dragging %s", an(buf));
+	    nomul(-2, buf);
 	    nomovemsg = "";
 	}
 
@@ -2464,6 +2470,11 @@ register boolean newlev;
 			rt = 0;
 			wake = TRUE;
 	    break;
+		case PRISON:
+		    You("enter a dingy prison!");
+			rt = 0;
+			wake = TRUE;
+	    break;
 		case LEPREHALL:
 		    You("enter a leprechaun hall!");
 			rt = 0;
@@ -2674,7 +2685,14 @@ lookaround()
 
     /* Grid bugs stop if trying to move diagonal, even if blind.  Maybe */
     /* they polymorphed while in the middle of a long move. */
-    if ((u.umonnum == PM_GRID_BUG || u.umonnum == PM_BEBELITH) && u.dx && u.dy) {
+    if (orthogonal_mover(&youmonst) && u.dx && u.dy) {
+	nomul(0, NULL);
+	return;
+    }
+
+    /* Sea people stop if trying to move orthogonally, even if blind.  Maybe */
+    /* they polymorphed while in the middle of a long move. */
+    if (diagonal_mover(&youmonst) && (u.dx || u.dy) && (!u.dx || !u.dy)) {
 	nomul(0, NULL);
 	return;
     }
@@ -2683,7 +2701,9 @@ lookaround()
     for(x = u.ux-1; x <= u.ux+1; x++) for(y = u.uy-1; y <= u.uy+1; y++) {
 	if(!isok(x,y)) continue;
 
-	if((u.umonnum == PM_GRID_BUG || u.umonnum == PM_BEBELITH) && x != u.ux && y != u.uy) continue;
+	if(orthogonal_mover(&youmonst) && x != u.ux && y != u.uy) continue;
+
+	if(diagonal_mover(&youmonst) && (x == u.ux) != (y == u.uy)) continue;
 
 	if(x == u.ux && y == u.uy) continue;
 
@@ -3195,7 +3215,11 @@ inv_weight()
 		//Correct artifact weights before adding them.  Because that code isn't being run.
 		if(otmp->oartifact) otmp->owt = weight(otmp);
 #ifndef GOLDOBJ
-		if (!is_boulder(otmp) || !(throws_rocks(youracedata) || u.sealsActive&SEAL_YMIR))
+		if(otmp->oartifact == ART_IRON_BALL_OF_LEVITATION)
+			wt -= otmp->owt;
+		else if(otmp->oartifact == ART_FLOATING_STONE)
+			wt -= 2*otmp->owt;
+		else if (!is_boulder(otmp) || !(throws_rocks(youracedata) || u.sealsActive&SEAL_YMIR))
 #else
 		if (otmp->oclass == COIN_CLASS){
 			objwt = (int)(((long)otmp->quan + 50L) / 100L);
@@ -3203,6 +3227,10 @@ inv_weight()
 				objwt = max(0, objwt - wtmod);
 			wt += objwt;
 		}
+		else if(otmp->oartifact == ART_IRON_BALL_OF_LEVITATION)
+			wt -= otmp->owt;
+		else if(otmp->oartifact == ART_FLOATING_STONE)
+			wt -= 2*otmp->owt;
 		else if (!is_boulder(otmp) || !(throws_rocks(youracedata) || u.sealsActive&SEAL_YMIR))
 #endif
 		{
@@ -3220,8 +3248,6 @@ inv_weight()
 			}
 		}
 
-		if(otmp->oartifact == ART_IRON_BALL_OF_LEVITATION)
-			wt -= 2*otmp->owt;
 		
 		if(u.uleadamulet && (otmp->otyp == AMULET_OF_YENDOR || otmp->otyp == FAKE_AMULET_OF_YENDOR))
 			wt += 24*otmp->owt; /* Same as loadstone by default. Only affects fake amulets in open inventory */

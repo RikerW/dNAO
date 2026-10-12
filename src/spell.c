@@ -187,7 +187,7 @@ STATIC_OVL boolean cursed_book(struct obj *bp){
 			aggravate();
 			break;
 		case 2:
-			make_blinded(Blinded + rn1(100,250),TRUE);
+			make_blinded(BlindedTimeout + rn1(100,250),TRUE);
 			break;
 		case 3:
 			pline_The("book develops a huge set of teeth and bites you!");
@@ -314,7 +314,7 @@ struct obj *book2;
 			 arti_cursed = FALSE;
 
 	if(book2->cursed) {
-	    pline_The("runes appear scrambled.  You can't read them!");
+	    pline_The("runes %s scrambled.  You can't read them!", Blind ? "feel" : "appear");
 	    return;
 	}
 
@@ -1606,6 +1606,7 @@ int atype;
 	case AD_STAR:
 	case AD_HLUH:
 	case AD_MADF:
+	case AD_SFLM:
 		return P_ATTACK_SPELL;
 	case AD_DRST:
 	case AD_ACID:
@@ -2480,7 +2481,7 @@ spiriteffects(power, atme)
 				}
 			}
 			You("feel your eyes freeze and pop!");
-			make_blinded(Blinded+5L,FALSE);
+			make_blinded(BlindedTimeout+5L,FALSE);
 		}break;
 		case PWR_BALAM_S_ANOINTING:{
 			//thick-skinned creatures loose their eyes
@@ -2640,7 +2641,7 @@ spiriteffects(power, atme)
 				
 				You("recover.");
 				if (Sick) make_sick(0L, (char *) 0, TRUE, SICK_ALL);
-				if (Blinded > (long)u.ucreamed) make_blinded((long)u.ucreamed, TRUE);
+				if (BlindedTimeout > (long)u.ucreamed) make_blinded((long)u.ucreamed, TRUE);
 				if (HHallucination) (void) make_hallucinated(0L, TRUE, 0L);
 				if (Vomiting) make_vomiting(0L, TRUE);
 				if (HConfusion) make_confused(0L, TRUE);
@@ -4849,6 +4850,7 @@ dothrowspell:
 							break;
 						}
 					}
+					if(youmonst.owrk) dam = (dam+1)/2;
 					explode_spell(u.dx, u.dy, adtype, 0, dam, color, rad, spell_flags);
 				}
 			}
@@ -6100,6 +6102,16 @@ int spell;
 			splcaster -= urole.spelarmr * cast_bon / 3;
 		}
 
+		if(uwep->otyp == HAMMER_OF_ETERNITY) {
+			cast_bon = 0;
+			if(spell_skilltype(spellid(spell)) == P_CLERIC_SPELL
+			 || spell_skilltype(spellid(spell)) == P_MATTER_SPELL
+			) cast_bon += 2;
+			if (uwep->oartifact)
+				cast_bon *= 2;
+			splcaster -= urole.spelarmr * cast_bon / 3;
+		}
+
 		if (uwep->otyp == BELL || uwep->otyp == BELL_OF_OPENING
 		 || uwep->otyp == EFFIGY
 		 || uwep->oartifact == ART_VELKA_S_RAPIER
@@ -6447,7 +6459,7 @@ int spell;
 			}
 		}
 		chance = min(100, chance);
-		if(dist < 100) chance -= 100-dist;
+		if(dist > 0 && dist < 100) chance -= 100-dist;
 	}
 	
 	//Panic can be overcome by Naen

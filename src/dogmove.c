@@ -21,6 +21,14 @@ extern boolean FDECL(would_prefer_rwep,(struct monst *,struct obj *));
 #define DOG_CHOKE 5*DOG_SATIATED
 #define SQSRCHRADIUS 5
 
+/* bundles what wantdoor() (a do_clear_area callback, so its signature is
+ * fixed) needs beyond x,y: the current best squared-distance and the
+ * seeking monster (used to exclude doors a diagonal_mover can't use) */
+struct wantdoor_ctx {
+	int distance;
+	struct monst *mon;
+};
+
 #ifdef OVL0
 
 STATIC_DCL boolean FDECL(dog_hunger,(struct monst *,struct edog *));
@@ -435,7 +443,7 @@ boolean devour;
 	if(obj->otyp == CORPSE){
 		mtyp = obj->corpsenm;
 		if (mtyp != PM_LIZARD && mtyp != PM_SMALL_CAVE_LIZARD && mtyp != PM_CAVE_LIZARD 
-			&& mtyp != PM_LARGE_CAVE_LIZARD && mtyp != PM_LICHEN && mtyp != PM_BEHOLDER
+			&& mtyp != PM_LARGE_CAVE_LIZARD && mtyp != PM_LICHEN && mtyp != PM_BEHOLDER && mtyp != PM_DEATH_BEHOLDER
 		) {
 			long age = peek_at_iced_corpse_age(obj);
 
@@ -944,6 +952,13 @@ pet_sphere_goal(struct monst *mtmp, struct edog *edog, int after, int udist, int
 				gx += sdx;
 				gy += sdy;
 			}
+			/* a cardinal flight path flips parity each step, so a
+			 * diagonal_mover may need to back off one square to land
+			 * back in its own world */
+			if(!shared_world(mtmp, gx, gy)){
+				gx -= sdx;
+				gy -= sdy;
+			}
 		}
 		appr = 1;
 	}
@@ -1113,10 +1128,12 @@ dog_find_track_goal(struct monst *mtmp, struct edog *edog, boolean in_masters_si
 		    gy = edog->ogoal.y;
 		    edog->ogoal.x = 0;
 		} else {
-		    int fardist = FARAWAY * FARAWAY;
+		    struct wantdoor_ctx wdc;
+		    wdc.distance = FARAWAY * FARAWAY;
+		    wdc.mon = mtmp;
 		    gx = gy = FARAWAY; /* random */
 		    do_clear_area(omx, omy, 9, wantdoor,
-				  (genericptr_t)&fardist);
+				  (genericptr_t)&wdc);
 
 		    /* here gx == FARAWAY e.g. when dog is in a vault */
 		    if (gx == FARAWAY || (gx == omx && gy == omy)) {
@@ -1431,6 +1448,20 @@ pet_goal(struct monst *mtmp, struct edog *edog, int after, int udist, int whappr
 	return dog_goal(mtmp, edog, after, udist, whappr);
 }
 
+/* mon-to-mon displacement is a deliberate "get out of my way" act; a pet
+   is cautious about where it barges another monster to. */
+STATIC_OVL boolean
+undesirable_disp(struct monst *mtmp, xchar x, xchar y)
+{
+	struct trap *trap = t_at(x, y);
+
+	if (trap && trap->tseen && rn2(40))
+		return TRUE;
+	if (!is_weldproof_mon(mtmp) && cursed_object_at(x, y))
+		return TRUE;
+	return FALSE;
+}
+
 /* return 0 (no move), 1 (move) or 2 (dead) */
 int
 dog_move(mtmp, after)
@@ -1449,6 +1480,7 @@ register int after;	/* this is extra fast monster movement */
 	int chi = -1, nidist, ndist;
 	coord poss[9];
 	long info[9], allowflags;
+	boolean better_with_displacing;
 #define GDIST(x,y) (dist2(x,y,gx,gy))
 
 	/*
@@ -1625,10 +1657,12 @@ register int after;	/* this is extra fast monster movement */
 	uncursedcnt = 0;
 	for (i = 0; i < cnt; i++) {
 		nx = poss[i].x; ny = poss[i].y;
-		if (MON_AT(nx,ny) && !(info[i] & ALLOW_M)) continue;
+		if (MON_AT(nx,ny) && !((info[i] & ALLOW_M) || (info[i] & ALLOW_MDISP))) continue;
 		if (!is_weldproof_mon(mtmp) && cursed_object_at(nx, ny)) continue;
 		uncursedcnt++;
 	}
+
+	better_with_displacing = should_displace(mtmp, poss, info, cnt, gx, gy);
 
 	chcnt = 0;
 	chi = -1;
@@ -1638,6 +1672,9 @@ register int after;	/* this is extra fast monster movement */
 		nx = poss[i].x;
 		ny = poss[i].y;
 		cursemsg[i] = FALSE;
+
+		if (MON_AT(nx, ny) && (info[i] & ALLOW_MDISP)
+			&& !(info[i] & ALLOW_M) && !better_with_displacing) continue;
 
 		/* if leashed, we drag him along. */
 		if (mtmp->mleashed && distu(nx, ny) > 4) continue;
@@ -1671,6 +1708,17 @@ register int after;	/* this is extra fast monster movement */
 			if (mstatus & MM_DEF_DIED) return 2;
 		    }
 
+		    return 0;
+		}
+
+		if ((info[i] & ALLOW_MDISP) && MON_AT(nx, ny)
+			&& better_with_displacing && !undesirable_disp(mtmp, nx, ny)) {
+		    int mstatus;
+		    struct monst *mtmp2 = m_at(nx, ny);
+
+		    mstatus = mdisplacem(mtmp, mtmp2, FALSE); /* displace monster */
+		    if (mstatus & MM_AGR_DIED) return 2;
+		    if (mstatus & MM_HIT) return 1;
 		    return 0;
 		}
 
@@ -1785,6 +1833,7 @@ newdogpos:
 		for (j=MTSZ-1; j>0; j--) mtmp->mtrack[j] = mtmp->mtrack[j-1];
 		mtmp->mtrack[0].x = omx;
 		mtmp->mtrack[0].y = omy;
+		update_proneness(mtmp);
 		/* We have to know if the pet's gonna do a combined eat and
 		 * move before moving it, but it can't eat until after being
 		 * moved.  Thus the do_eat flag.
@@ -1837,7 +1886,8 @@ xchar nx, ny;
 {
     if ((!is_pool(nx,ny, FALSE) || mon_resistance(mon,SWIMMING)) &&
 	(!is_lava(nx,ny) || likes_lava(mon->data)) &&
-	(!boulder_at(nx,ny) || throws_rocks(mon->data)))
+	(!boulder_at(nx,ny) || throws_rocks(mon->data)) &&
+	shared_world(mon, nx, ny))
     	return TRUE;
     return FALSE;
 }
@@ -1887,16 +1937,25 @@ xchar mx, my, fx, fy;
 
 /*ARGSUSED*/	/* do_clear_area client */
 STATIC_PTR void
-wantdoor(x, y, distance)
+wantdoor(x, y, arg)
 int x, y;
-genericptr_t distance;
+genericptr_t arg;
 {
+    struct wantdoor_ctx *wdc = (struct wantdoor_ctx *)arg;
     int ndist;
 
-    if (*(int*)distance > (ndist = distu(x, y))) {
+    /* a diagonal_mover can't pass through an intact door at all
+     * and separately still needs the door to be in the correct world */
+    if (diagonal_mover(wdc->mon)
+	&& (!IS_DOOR(levl[x][y].typ)
+	    || (levl[x][y].doormask & ~D_BROKEN)
+	    || !shared_world(wdc->mon, x, y)))
+	return;
+
+    if (wdc->distance > (ndist = distu(x, y))) {
 	gx = x;
 	gy = y;
-	*(int*)distance = ndist;
+	wdc->distance = ndist;
     }
 }
 

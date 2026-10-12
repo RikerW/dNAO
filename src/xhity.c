@@ -10,8 +10,6 @@ extern int monstr[];
 
 #define STILLVALID(mdef) (!DEADMONSTER(mdef) && !MIGRATINGMONSTER(mdef) && mdef == m_at(u.ux + u.dx, u.uy + u.dy))
 
-#define ZFOCUS(otmp) (otmp && (otmp->obj_material == MERCURIAL) && (artinstance[ART_SKY_REFLECTED].ZerthUpgrades&ZPROP_FOCUS) && (BlockableClearThoughts || (u.usanity-80) > rnd(10)))
-
 STATIC_DCL void FDECL(wildmiss, (struct monst *, struct attack *, struct obj *, boolean));
 STATIC_DCL boolean FDECL(u_surprise, (struct monst *, boolean));
 STATIC_DCL struct attack * FDECL(getnextspiritattack, (boolean));
@@ -115,6 +113,7 @@ int subout;
 {
 	if(subout > MAX_SUBOUT || subout < 1){
 		impossible("Attempting to set subout number %d?", subout);
+		return;
 	}
 	int size = sizeof(int)*8;
 	subout_list[(subout-1)/size] |= (0x1L << ((subout-1)%size));
@@ -126,9 +125,11 @@ int *subout_list;
 int subout;
 {
 	if(subout > MAX_SUBOUT || subout < 1){
-		impossible("Attempting to set subout number %d?", subout);
+		impossible("Attempting to remove subout number %d?", subout);
+		return;
 	}
-	subout_list[(subout-1)/16] &= ~(0x1L << ((subout-1)%16));
+	int size = sizeof(int)*8;
+	subout_list[(subout-1)/size] &= ~(0x1L << ((subout-1)%size));
 }
 
 void
@@ -242,6 +243,10 @@ struct monst * mdef;
 	}
 	//If the player can't attack and is wearing a straitjacket, redirect to the kick function
 	if(Straitjacketed && !at_least_one_attack(&youmonst)){
+		if(u.uentangled_oid){
+			You("struggle against your bindings!");
+			return TRUE;
+		}
 		dokick_core(u.dx, u.dy);
 		//Dokick can't move you
 		return TRUE;
@@ -509,6 +514,7 @@ xattacky(struct monst *magr, struct monst *mdef, int tarx, int tary, long modifi
 	if (youdef && !magr->cham && gates_in_help(pa) && !template_blocks_gate(magr)
 		&& !ranged && !missedyou && (magr->summonpwr < magr->data->mlevel)
 		&& !(uwep && uwep->oartifact && arti_worn_prop(uwep, ARTP_NOCALL) && is_demon(magr->data))
+		&& !DimensionalLock
 	) {
 		
 		if (!magr->mcan && !rn2(13)) {
@@ -2589,6 +2595,28 @@ int * tohitmod;					/* some attacks are made with decreased accuracy */
 				attk->aatyp = AT_MARI;
 		}
 	}
+	/* Death Eye: each round uses only one of its bites, random gaze, or death gaze; the passive always applies */
+	if (!by_the_book && fromlist && pa->mtyp == PM_DEATH_BEHOLDER) {
+		if (*indexnum == 0) {
+			int roll = rn2(4);
+			if (roll == 0)
+				add_subout(subout, SUBOUT_DEATHEYE_BITES);
+			else if (roll == 3)
+				add_subout(subout, SUBOUT_DEATHEYE_DEATH);
+		}
+		if (attk->aatyp == AT_BITE || attk->aatyp == AT_TONG) {
+			if (!check_subout(subout, SUBOUT_DEATHEYE_BITES))
+				GETNEXT
+		}
+		else if (attk->aatyp == AT_GAZE && attk->adtyp == AD_RGAZ) {
+			if (check_subout(subout, SUBOUT_DEATHEYE_BITES) || check_subout(subout, SUBOUT_DEATHEYE_DEATH))
+				GETNEXT
+		}
+		else if (attk->aatyp == AT_GAZE && attk->adtyp == AD_DEAD) {
+			if (!check_subout(subout, SUBOUT_DEATHEYE_DEATH))
+				GETNEXT
+		}
+	}
 	/* monsters in magic stance restrict themselves to spellcasting attacks,
 	   but also keep squeeze, passive, and explosion attacks */
 	if (!youagr && magr->mstance == MSTANCE_MAGIC) {
@@ -3053,6 +3081,23 @@ int * tohitmod;					/* some attacks are made with decreased accuracy */
 				add_subout(subout, SUBOUT_V_CLAWS2);
 			else
 				add_subout(subout, SUBOUT_V_CLAWS1);
+		}
+	}
+	{
+		struct obj * otmp;
+		if (!youagr && is_null_attk(attk)
+			&& !check_subout(subout, SUBOUT_KICKING_BOOTS)
+			&& !check_subout(subout, SUBOUT_KICK)
+			&& (otmp = which_armor(magr, W_ARMF))
+			&& otmp->otyp == KICKING_BOOTS
+		){
+			attk->aatyp = AT_KICK;
+			attk->adtyp = AD_PHYS;
+			attk->damn = 1;
+			attk->damd = 2*magr->data->msize;
+			attk->bodypart = ATKBP(LEG);
+			fromlist = FALSE;
+			add_subout(subout, SUBOUT_KICKING_BOOTS);
 		}
 	}
 
@@ -3659,11 +3704,13 @@ int * tohitmod;					/* some attacks are made with decreased accuracy */
 		return getattk(magr, mdef, prev_res, indexnum, prev_and_buf, by_the_book, subout, tohitmod);
 	}
 
-	/* possibly increment indexnum, if we want to move on in the monster's attack list 
+	/* possibly increment indexnum, if we want to move on in the monster's attack list
 	 * this is most of the time, except for when we have inserted attacks into [magr]'s chain */
 	if (fromlist) {
 		*indexnum += 1;
 	}
+	if (attk->aatyp == AT_KICK)
+		add_subout(subout, SUBOUT_KICK);
 	return attk;
 }
 #undef GETNEXT
@@ -4637,7 +4684,7 @@ int vis;
 				if (youdef) {
 					if(!Blind)
 						You("go blind!");
-					make_blinded(Blinded + d(3, 3), FALSE);
+					make_blinded(BlindedTimeout + d(3, 3), FALSE);
 				}
 				else {
 					if (canseemon(mdef) && !is_blind(mdef))
@@ -4831,6 +4878,8 @@ int *shield_margin;
 	}
 	/* other attacker-related accuracy bonuses */
 	if (magr) {
+		if (magr->mprone)
+			bons_acc -= 3;
 		/* Small monsters are more accurate */
 		switch(pa->msize){
 			case MZ_TINY:
@@ -4840,6 +4889,9 @@ int *shield_margin;
 				bons_acc += 2;
 			break;
 		}
+		/* ruh anti-syllable */
+		if (magr->ruh)
+			bons_acc -= 10;
 		/* player-only accuracy bonuses */
 		if (youagr) {
 			/* base +1/-1 for no reason */
@@ -6833,7 +6885,7 @@ xmeleehurty_core(struct monst *magr, struct monst *mdef, struct attack *attk, st
 		if (can_blnd(magr, mdef, attk->aatyp, (struct obj*)0)) {
 			if (youdef){
 				if (!Blind) pline("%s blinds you!", Monnam(magr));
-				make_blinded(Blinded + (long)dmg, FALSE);
+				make_blinded(BlindedTimeout + (long)dmg, FALSE);
 				if (!Blind) Your1(vision_clears);
 			}
 			else {
@@ -10415,7 +10467,7 @@ xmeleehurty_core(struct monst *magr, struct monst *mdef, struct attack *attk, st
 					"cursed unicorn's horn", TRUE, SICK_NONVOMITABLE);
 				break;
 			case 1:
-				make_blinded(Blinded + lcount, TRUE);
+				make_blinded(BlindedTimeout + lcount, TRUE);
 				break;
 			case 2: if (!Confusion)
 				You("suddenly feel %s.",
@@ -11462,7 +11514,10 @@ xmeleehurty_core(struct monst *magr, struct monst *mdef, struct attack *attk, st
 						dmg *= 1.5;
 					}
 					else if(magr->mtyp == PM_RHOMBOHEDROID){
-						pline("The black light fills your mind with surreal images of your crimes!");
+						if(tentacles)
+							pline("The fanged tentacles inject strange liquids, and your mind fills with surreal images of your crimes!");
+						else
+							pline("The black light fills your mind with surreal images of your crimes!");
 						dmg *= 1.5;
 						dmg += u.hod + u.ualign.sins;
 					}
@@ -11513,6 +11568,7 @@ xmeleehurty_core(struct monst *magr, struct monst *mdef, struct attack *attk, st
 	case AD_SPEL:
 		/* gaze only, AT_GAZE or AT_WDGZ */
 	case AD_SSUN:
+	case AD_LGHT:
 	case AD_SPOR:
 	case AD_BLNK:
 	case AD_WTCH:
@@ -12292,7 +12348,7 @@ int vis;
 				}
 				else
 					/* keep player blind until disgorged */
-					make_blinded(Blinded + 1, FALSE);
+					make_blinded(BlindedTimeout + 1, FALSE);
 			}
 			else {
 				struct obj *otmp = dust_mask ? dust_mask : towel;
@@ -12746,7 +12802,7 @@ int vis;
 				}
 				else
 					/* keep player blind until disgorged */
-					make_blinded(Blinded + 1, FALSE);
+					make_blinded(BlindedTimeout + 1, FALSE);
 			}
 			else {
 				if (vis&VIS_MDEF && mdef->mcansee)
@@ -13631,6 +13687,7 @@ getgazeinfo(int aatyp, int adtyp, struct permonst *pa, struct monst *magr, struc
 	case AD_COLD:
 	case AD_ELEC:
 	case AD_DARK:
+	case AD_LGHT:
 	case AD_DRLI:
 	case AD_CNCL:
 	case AD_ENCH:
@@ -13701,6 +13758,7 @@ int vis;
 	static const int randomgazeattacks[] = { AD_DEAD, AD_CNCL, AD_PLYS, AD_DRLI, AD_ENCH, AD_STON, AD_LUCK,
 		AD_CONF, AD_SLOW, AD_STUN, AD_BLND, AD_FIRE, AD_FIRE,
 		AD_COLD, AD_COLD, AD_ELEC, AD_ELEC, AD_HALU, AD_SLEE };
+	static const int deatheyegazeattacks[] = { AD_PLYS, AD_CNCL, AD_STON, AD_DEAD, AD_CONF, AD_SLOW };
 	static const int elementalgazeattacks[] = { AD_FIRE, AD_COLD, AD_ELEC };
 	struct obj *ahelm = youagr ? uarmh : which_armor(magr, W_ARMH);
 	struct obj *acloak = youagr ? uarmc : which_armor(magr, W_ARMC);
@@ -13711,7 +13769,20 @@ int vis;
 	int result = MM_MISS;
 	int adtyp = attk->adtyp;
 	int dmg = d((int)attk->damn, (int)attk->damd);
-	int fulldmg = dmg;			/* original unreduced damage */
+	int fulldmg;			/* original unreduced damage */
+
+	/* a lens array sharpens or blurs the gaze it focuses: undamaged, it
+	 * takes the better of two rolls; damaged, the worse of two.
+	 * 
+	 * Note: Quinon's have an invisible lens array that isn't listed in the body parts and so can't be damaged.
+	 */
+	if (atkbp_intersects(magr->mbodyparts_full, ATKBP(LENS_ARRAY)) || magr->mtyp == PM_QUINON) {
+		int dmg2 = d((int)attk->damn, (int)attk->damd);
+
+		dmg = atkbp_intersects(magr->minjuries, ATKBP(LENS_ARRAY))
+		      ? min(dmg, dmg2) : max(dmg, dmg2);
+	}
+	fulldmg = dmg;
 
 	if (vis == -1)
 		vis = getvis(magr, mdef, 0, 0);
@@ -13729,7 +13800,10 @@ int vis;
 	switch (adtyp)
 	{
 	case AD_RGAZ:
-		adtyp = randomgazeattacks[rn2(SIZE(randomgazeattacks))];
+		if (pa->mtyp == PM_DEATH_BEHOLDER)
+			adtyp = ROLL_FROM(deatheyegazeattacks);
+		else
+			adtyp = ROLL_FROM(randomgazeattacks);
 		break;
 	case AD_RBRE:
 	case AD_RETR:
@@ -13836,6 +13910,44 @@ int vis;
 		alt_attk.adtyp = adtyp;
 		result = xmeleehurty(magr, mdef, &alt_attk, attk, (struct obj **)0, FALSE, dmg, 0, vis, TRUE);
 		wakeup2(mdef, youagr);
+		break;
+
+	case AD_LGHT:
+		/* can't gaze while the light-emitting cells are exhausted */
+		if (get_timer(magr->timed, LIGHT_EXHAUSTED))
+			return MM_MISS;
+		/* 4/5 chance to succeed */
+		if (maybe_not && !rn2(5))
+			return MM_MISS;
+		/* message */
+		if (vis&VIS_MAGR) {
+			pline("%s attack%s %s with a lance of light.",
+				(youagr ? "You" : Monnam(magr)),
+				(youagr ? "" : "s"),
+				(youdef ? "you" : mon_nam(mdef))
+				);
+		}
+		/* using the gaze may exhaust the light-emitting cells, which stop glowing while they recover */
+		if (!youagr && !rn2(3)) {
+			start_timer(10 + rn2(20), TIMER_MONSTER, LIGHT_EXHAUSTED, (genericptr_t)magr);
+			del_light_source(magr->light);
+		}
+		/* only reflection protects against light */
+		if (youdef ? (Reflecting != 0) : mon_resistance(mdef, REFLECTING)) {
+			if (youdef)
+				(void)ureflects((vis&VIS_MAGR) ? "%s stare is reflected by your %s." : (char *)0,
+					s_suffix(Monnam(magr)));
+			else
+				(void)mon_reflects(mdef, (vis&VIS_MDEF) ? "The searing light is reflected by %s %s!" : (char *)0);
+			result = MM_HIT;
+		}
+		else {
+			if (youdef)
+				stop_occupation();
+			result = xdamagey(magr, mdef, attk, dmg);
+			if (*hp(mdef) > 0)
+				wakeup2(mdef, youagr);
+		}
 		break;
 
 	case AD_BDFN:
@@ -15743,7 +15855,9 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 	boolean shattering_strike = FALSE;
 	boolean disarming_strike = FALSE;
 	boolean stunning_strike = FALSE;
+	boolean whip_tricks = FALSE;
 	boolean braced_weapon = FALSE;
+	boolean anti_undead_strike = FALSE;
 	int jousting = 0;		/* can be 1 (joust), 0 (ordinary hit), -1 (joust and lance breaks) */
 	int sneak_dice = 0;
 	int sneak_attack = 0;
@@ -16151,6 +16265,8 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 			sneak_dice++;
 		if (Role_if(PM_UNDEAD_HUNTER) && !Upolyd)
 			sneak_dice++;
+		if (u.uurchin && !Upolyd)
+			sneak_dice++;
 		if (Role_if(PM_ANACHRONONAUT) && Race_if(PM_MYRKALFR) && !Upolyd)
 			sneak_dice++;
 		if (Role_if(PM_CONVICT) && !Upolyd && weapon && weapon->owornmask && (weapon->otyp == SPOON || (weapon->oartifact == ART_STORM_CURSE && weapon->o_e_trait&ETRAIT_FOCUS_FIRE)))
@@ -16296,10 +16412,14 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 		}
 
 		/* calculate snekdmg */
-		/* Undead Hunters are not as good as Rogues, but any additional source of sneak attack damage upgrades their natural die to a regular-strength one */
-		if(youagr && Role_if(PM_UNDEAD_HUNTER) && !Upolyd && sneak_dice == 1){
+		/* Undead Hunters and urchins are not as good as Rogues, but any
+		   additional source of sneak attack damage upgrades their natural die
+		   to a regular-strength one */
+		if(youagr && (Role_if(PM_UNDEAD_HUNTER) || u.uurchin) && !Upolyd && sneak_dice == 1){
 			snekdie = (2*snekdie+1)/3;
 		}
+		if(youagr && u.uurchin && !Upolyd)
+			snekdie += 2;
 		if (weapon && weapon->owornmask && Role_if(PM_KENSEI) && u.role_variant == ART_ANSERMEE && is_kensei_weapon(weapon))
 			snekdie += 3;
 		// snekdmg = d(sneak_dice, snekdie);
@@ -16393,9 +16513,29 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 	){
 		if((youagr && ZFOCUS(weapon)) 
 		? ROLL_ETRAIT(weapon, magr, rn2(4), !rn2(5))
-		: ROLL_ETRAIT(weapon, magr, !rn2(2), !rn2(10))
+		: ROLL_ETRAIT(weapon, magr, rn2(2), !rn2(10))
 		)
 			stunning_strike = TRUE;
+	}
+	// Whip-tricks expert weapon trait
+	if(!recursed && weapon && valid_weapon_attack && 
+		 magr && CHECK_ETRAIT(weapon, magr, ETRAIT_WHIP_TRICKS)
+	){
+		if((youagr && ZFOCUS(weapon)) 
+		? ROLL_ETRAIT(weapon, magr, rn2(4), !rn2(3))
+		: ROLL_ETRAIT(weapon, magr, rn2(2), !rn2(5))
+		)
+			whip_tricks = TRUE;
+	}
+	// Anti-undead expert weapon trait
+	if(!recursed && weapon && valid_weapon_attack && is_undead(pd) &&
+		 magr && CHECK_ETRAIT(weapon, magr, ETRAIT_ANTI_UNDEAD)
+	){
+		if((youagr && ZFOCUS(weapon)) 
+		? ROLL_ETRAIT(weapon, magr, rn2(4), !rn2(5))
+		: ROLL_ETRAIT(weapon, magr, rn2(2), !rn2(10))
+		)
+			anti_undead_strike = TRUE;
 	}
 	/* monk special */
 	if (youagr && (melee || thrust) && !recursed && !Upolyd) {
@@ -17481,7 +17621,7 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 								(num_eyes == 1) ? "s" : "");
 						}
 						u.ucreamed += blindinc;
-						make_blinded(Blinded + (long)blindinc, FALSE);
+						make_blinded(BlindedTimeout + (long)blindinc, FALSE);
 						if (!Blind)
 							Your1(vision_clears);
 					}
@@ -17857,6 +17997,11 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 		/* general damage bonus */
 		if(real_attack){
 			if (magr && (valid_weapon_attack || fake_valid_weapon_attack || unarmed_punch || unarmed_kick || natural_strike)) {
+				/* Anti-syllable damage penalty */
+				if(magr && magr->shey)
+					bonsdmg -= 10;
+				if(!youagr && has_syllable(magr->data) && magr->mvar_syllable == SYLLABLE_OF_STRENGTH__AESH)
+					bonsdmg += 5;
 				/* player-specific bonuses */
 				if (youagr) {
 					bonsdmg += u.udaminc;
@@ -18359,6 +18504,17 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 						tratdmg += weapon_dam_bonus(weapon, weapon_type(weapon));
 				}
 			}
+			if(anti_undead_strike){
+				struct weapon_dice wdice;
+				if (wizard && (iflags.wizcombatdebug & WIZCOMBATDEBUG_DMG) && WIZCOMBATDEBUG_APPLIES(magr, mdef))
+					pline("Anti-undead strike bonus damage!");
+				/* grab the weapon dice from dmgval_core */
+				dmgval_core(&wdice, bigmonst(pd), weapon, weapon->otyp, magr);
+				/* add to the tratdmg counter */
+				tratdmg += weapon_dmg_roll(&wdice, youdef);
+				if(youagr)
+					tratdmg += weapon_dam_bonus(weapon, weapon_type(weapon));
+			}
 		}
 	}
 	/* monk special: bonus damage */
@@ -18785,7 +18941,11 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 				resisted_thick_skin = TRUE;
 			}
 		}
-		if ((attackmask & ~(resistmask)) == 0L && !(strike_obj && spec_applies(strike_obj, mdef, TRUE)) && (subtotl > 0)) {
+		if ((attackmask & ~(resistmask)) == 0L
+			&& (subtotl > 0)
+			&& !(strike_obj && spec_applies(strike_obj, mdef, TRUE))
+			&& !(strike_obj && magr && CHECK_ETRAIT(strike_obj, magr, ETRAIT_ANTI_UNDEAD) && is_undead(mdef->data))
+		) {
 			/* damage reduced by 75% */
 			subtotl /= 4;
 			resisted_attack_type = TRUE;
@@ -19007,6 +19167,7 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 				!staggering_strike &&
 				!monk_staggering_strike &&
 				!stunning_strike &&
+				!anti_undead_strike &&
 				!(youagr && lethaldamage) &&
 				!(youagr && snekdmg))
 			{
@@ -19192,6 +19353,14 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 	if (bleeding_strike && !lethaldamage) {
 		if (vis)
 			pline("%s sustained a bleeding wound in the fighting!", youdef ? "You" : Monnam(mdef));
+	}
+	if(anti_undead_strike && !lethaldamage){
+		if(vis){
+			if(skeletal(pd))
+				pline("%s brittle %s are pulverized by the blow!", youdef ? "Your" : s_suffix(Monnam(mdef)), mbodypart(mdef, BONES));
+			else
+				pline("%s rotted %s is pulverized by the blow!", youdef ? "Your" : s_suffix(Monnam(mdef)), mbodypart(mdef, BODY_FLESH));
+		}
 	}
 	if(weapon && (weapon->obj_material == HEMARGYOS || check_oprop(weapon, OPROP_HAEM))){
 		if(youagr && !youdef){
@@ -19987,6 +20156,18 @@ hmoncore(struct monst *magr, struct monst *mdef, struct attack *attk, struct att
 	/* ALL EFFECTS AFTER THIS POINT REQUIRE THE DEFENDER TO SURVIVE THE ATTACK (not including lifesaving) */
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	if (whip_tricks) {
+		if(youagr){
+			use_whip(weapon, mdef);
+		}
+		else {
+			/* defwep: whatever weapon the defender is currently wielding,
+			 * if any; NULL is fine. */
+			struct obj *defwep = (mdef == &youmonst) ? uwep
+					: (rn2(3) ? MON_WEP(mdef) : MON_SWEP(mdef));
+			mon_whip_tricks(magr, mdef, defwep);
+		}
+	}
 	/* apply confuse monster (player only) */
 	if (youagr && u.umconf && !mdef->mconf) {
 		char *hands = makeplural(body_part(HAND));
@@ -21845,7 +22026,7 @@ android_combo()
 
 		if (uwep && P_SKILL(weapon_type(uwep)) >= P_SKILLED && u.uen > 0){
 			/* get direction AND do whip things */
-			if (!use_whip(uwep) || !uwep)
+			if (!use_whip(uwep, (struct monst *)0) || !uwep)
 				return MOVE_ATTACKED;
 			/* get defender */
 			if (u.ustuck && u.uswallow)
@@ -21866,7 +22047,7 @@ android_combo()
 
 		if (uwep && P_SKILL(weapon_type(uwep)) >= P_EXPERT && u.uen > 0){
 			/* get direction AND do whip things */
-			if (!use_whip(uwep) || !uwep)
+			if (!use_whip(uwep, (struct monst *)0) || !uwep)
 				return MOVE_ATTACKED;
 			if (uwep->otyp == FORCE_WHIP){
 				/* turn it into a sword */
@@ -25578,6 +25759,10 @@ struct monst * mdef;
 		case PM_BLIBDOOLPOOLP__GRAVEN_INTO_FLESH:
 			cnum = 10;
 		break;
+		case PM_LEADEN_ANCESTOR:{
+			int roll = rnd(100);
+			cnum = (roll <= 70) ? 11 : (roll <= 90) ? 12 : 13;
+		}break;
 		default:
 			cnum = 0;
 		break;
@@ -25907,6 +26092,76 @@ struct monst * mdef;
 			else
 				m_losehp(mdef, dmg, youagr, "liquid lightning");
 		}break;
+		//Mind scream
+		case 11:
+			if(youdef){
+				boolean m_sen = tp_sensemon(magr);
+				if(m_sen || (Blind_telepat && rn2(2)) || !rn2(10)){
+					int dmg = d(min(max((mlev(magr))/3, 1), MAX_BONUS_DICE), 7);
+					pline("%s screams into your mind%s!", Monnam(magr), m_sen ? " through your telepathy" : Blind_telepat ? " through your latent telepathy" : "");
+					dmg = reduce_dmg(mdef,dmg,FALSE,TRUE);
+					losehp(dmg, "psychic scream", KILLED_BY_AN);
+				}
+			}
+			else {
+				boolean m_sen = species_is_telepathic(mdef->data) ||
+					(mon_resistance(mdef,TELEPAT) && mdef->mblinded);
+				boolean latent_sen = !m_sen && (mon_resistance(mdef,TELEPAT) && rn2(2));
+				if (m_sen || latent_sen || !rn2(10)) {
+					int dmg = d(min(max((mlev(magr))/3, 1), MAX_BONUS_DICE), 7);
+					dmg = reduce_dmg(mdef,dmg,FALSE,TRUE);
+					m_losehp(mdef, dmg, youagr, "a psychic scream");
+				}
+			}
+		break;
+		//Scuttling spider
+		case 12:{
+			struct obj *arm;
+			if(Sick_res(mdef))
+				break;
+			arm = youdef ? uarm : which_armor(mdef, W_ARM);
+			if(youdef){
+				if (!umechanoid) {
+					if(arm)
+						pline("A hand-sized spider leaps onto your %s and swiftly scuttles into your %s!", body_part(ARM), xname(arm));
+					else
+						pline("A hand-sized spider leaps onto your %s and swiftly sinks its fangs into your %s!", body_part(ARM), body_part(BODY_FLESH));
+					make_sick(Sick ? Sick / 3L + 1L : (long)rn1(ACURR(A_CON), 20),
+						pa->mname, TRUE, SICK_NONVOMITABLE);
+				}
+			}
+			else {
+				if(canseemon(mdef)){
+					if(arm)
+						pline("A hand-sized spider leaps onto %s %s and swiftly scuttles into %s %s!",
+							s_suffix(mon_nam(mdef)), mbodypart(mdef, ARM),
+							s_suffix(mon_nam(mdef)), xname(arm));
+					else
+						pline("A hand-sized spider leaps onto %s %s and swiftly sinks its fangs into its %s!",
+							s_suffix(mon_nam(mdef)), mbodypart(mdef, ARM), mbodypart(mdef, BODY_FLESH));
+				}
+				/* 1/10 chance of instakill */
+				if (!rn2(10)){
+					if (youagr) killed(mdef);
+					else monkilled(mdef, "", AD_SPEL);
+					/* instakill */
+					return ((*hp(mdef) > 0 ? MM_DEF_LSVD : MM_DEF_DIED) | MM_HIT);
+				}
+				else {
+					return xdamagey(magr, mdef, (struct attack *)0, rnd(12));
+				}
+			}
+		}break;
+		//Death scream (mimics AD_MAND)
+		case 13:{
+			boolean magr_vis = canseemon(magr);
+			if(magr->mcan){
+				break;
+			}
+			else if(magr_vis)
+				pline("%s lets out a terrible shriek!", Monnam(magr));
+			mandrake_shriek(magr, youagr, "the once-contained scream of a leaden ancestor");
+		}break;
 	}
 	return MM_MISS;
 }
@@ -25918,6 +26173,9 @@ int dmg;
 boolean physical;
 boolean magical;
 {
+	/** Anti-syllable damage multiplier **/
+	if (mdef->luahv)
+		dmg *= 2;
 	if (physical && Half_phys(mdef))
 		dmg = (dmg + 1) / 2;
 	if (magical && Half_spel(mdef))
@@ -25955,6 +26213,7 @@ elemental_dmg_resistance(struct monst *mdef, struct monst *magr, int dmg, int da
 	if(mdef == &youmonst) {
 		switch(damtype) {
 		case AD_FIRE:
+		case AD_SFLM:
 			has_base = u.uprops[FIRE_RES].intrinsic || u.uprops[FIRE_RES].extrinsic ||
 			           (species_resists_fire(&youmonst) && !(Race_if(PM_ANDROID) && !Upolyd));
 			has_hell  = u.uprops[HELL_FIRE_RES].intrinsic || u.uprops[HELL_FIRE_RES].extrinsic;
@@ -25992,6 +26251,7 @@ elemental_dmg_resistance(struct monst *mdef, struct monst *magr, int dmg, int da
 	} else {
 		switch(damtype) {
 		case AD_FIRE:
+		case AD_SFLM:
 			has_base = species_resists_fire(mdef) || mon_resistance(mdef, FIRE_RES);
 			has_hell  = mon_resistance(mdef, HELL_FIRE_RES);
 			has_base_both = (species_resists_fire(mdef) || mon_intrinsic(mdef, FIRE_RES)) && mon_extrinsic(mdef, FIRE_RES);

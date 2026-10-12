@@ -304,7 +304,8 @@ struct monst *mtmp;
 	}
 	if(mtmp->mtyp == PM_OONA){
 		boolean recover = FALSE;
-		if(!mtmp->mnotlaugh || !mtmp->mcansee || mtmp->mberserk || !mtmp->mcanmove || mtmp->mstdy > 20 || mtmp->mstun || mtmp->mconf || mtmp->msleeping || mtmp->mbleed || mtmp->mgmld_throat || mtmp->mgmld_skin)
+		if(!mtmp->mnotlaugh || !mtmp->mcansee || mtmp->mberserk || !mtmp->mcanmove || mtmp->mstdy > 20 || mtmp->mstun || mtmp->mconf || mtmp->msleeping || mtmp->mbleed || mtmp->mgmld_throat || mtmp->mgmld_skin
+			|| mtmp->owrk || mtmp->ruh || mtmp->shey || mtmp->luahv || mtmp->nean || mtmp->nooh)
 			recover = TRUE;
 		else {
 			register struct obj *otmp;
@@ -467,10 +468,11 @@ struct monst *mtmp;
 		for(xx = x-1; xx <= x+1; xx++) for(yy = y-1; yy <= y+1; yy++)
 		if (isok(xx,yy))
 		if (!(xx == u.ux && yy == u.uy))
-		if ((mtmp->mtyp != PM_GRID_BUG && mtmp->mtyp != PM_BEBELITH) || xx == x || yy == y)
+		if (!orthogonal_mover(mtmp) || xx == x || yy == y)
+		if (!diagonal_mover(mtmp) || ((xx == x) == (yy == y)))
 		if(!is_vectored_mtyp(mtmp->mtyp) ||
-			(x + xdir[(int)mtmp->mvar_vector] == xx && 
-			   y + ydir[(int)mtmp->mvar_vector] == yy 
+			(x + xdir[(int)mtmp->mvar_vector] == xx &&
+			   y + ydir[(int)mtmp->mvar_vector] == yy
 			)
 		)
 		if ((xx==x && yy==y) || !level.monsters[xx][yy])
@@ -1039,6 +1041,12 @@ mon_tele:
 		mtmp->mbleed = 0;
 		mtmp->mgmld_throat = 0;
 		mtmp->mgmld_skin = 0;
+		mtmp->owrk = 0;
+		mtmp->ruh = 0;
+		mtmp->shey = 0;
+		mtmp->luahv = 0;
+		mtmp->nean = 0;
+		mtmp->nooh = 0;
 		boolean blessed = mlev(mtmp) > 13;
 		for (struct obj *obj = mtmp->minvent; obj; obj = obj->nobj)
 		{
@@ -2277,7 +2285,8 @@ struct monst *mtmp;
 	  for(xx = x-1; xx <= x+1; xx++)
 	    for(yy = y-1; yy <= y+1; yy++)
 		if (isok(xx,yy) && !(xx == u.ux && yy == u.uy))
-		    if ((mdat->mtyp != PM_GRID_BUG && mtmp->mtyp != PM_BEBELITH) || xx == x || yy == y)
+		    if (!orthogonal_mover(mtmp) || xx == x || yy == y)
+		    if (!diagonal_mover(mtmp) || ((xx == x) == (yy == y)))
 			if(!is_vectored_mtyp(mtmp->mtyp) ||
 				(x + xdir[(int)mtmp->mvar_vector] == xx && 
 				   y + ydir[(int)mtmp->mvar_vector] == yy 
@@ -2331,9 +2340,9 @@ struct monst *mtmp;
 			// m.has_misc = MUSE_POT_GAIN_ABILITY;
 		// }
 		nomore(MUSE_BULLWHIP);
-		if((obj->otyp == BULLWHIP || obj->otyp == VIPERWHIP || obj->otyp == FORCE_WHIP) 
+		if((obj->otyp == BULLWHIP || obj->otyp == VIPERWHIP || obj->otyp == FORCE_WHIP)
 			&& (MON_WEP(mtmp) == obj || MON_SWEP(mtmp) == obj) &&
-			distu(mtmp->mx,mtmp->my)==1 && uwep && !mtmp->mpeaceful &&
+			distu(mtmp->mx,mtmp->my)==1 && (uwep || could_trip(mtmp, &youmonst)) && !mtmp->mpeaceful &&
 			magr_can_attack_mdef(mtmp, &youmonst, u.ux, u.uy, TRUE)
 		) {
 			m.misc = obj;
@@ -2784,100 +2793,7 @@ museamnesia:
 		else if(!resists_poly(mtmp->data)) newcham(mtmp, NON_PM, FALSE, FALSE);
 		return 2;
 	case MUSE_BULLWHIP:
-		/* attempt to disarm hero */
-		if (uwep && !rn2(5)) {
-		    const char *The_whip = vismon ? "The whip" : "A whip";
-		    int where_to = rn2(4);
-		    struct obj *obj = uwep;
-		    const char *hand;
-		    char the_weapon[BUFSZ];
-
-		    Strcpy(the_weapon, the(xname(obj)));
-		    hand = body_part(HAND);
-		    if (bimanual_mon(obj,&youmonst)) hand = makeplural(hand);
-
-		    if (vismon){
-				pline("%s flicks a whip towards your %s!", Monnam(mtmp), hand);
-			}
-		    if (obj->otyp == BALL) {
-				pline("%s fails to wrap around %s.", The_whip, the_weapon);
-				return 1;
-		    }
-		    
-		    if (obj->oartifact)
-		   		pline("%s wraps around your wielded %s!", The_whip, the_weapon);
-		    else
-		    	pline("%s wraps around %s you're wielding!", The_whip, the_weapon);
-		    
-		    if (welded(obj)) {
-				pline("%s welded to your %s%c", !is_plural(obj) ? "It is" : "They are",
-					hand, !obj->bknown ? '!' : '.');
-				/* obj->bknown = 1; */ /* welded() takes care of this */
-				where_to = 0;
-		    }
-		    
-		    if (obj->oartifact == ART_GLAMDRING){
-		    	pline("Glamdring resists being ripped out of your hands!");
-		    	where_to = 0;
-		    }
-		    
-		    if (obj->oartifact == ART_DIRGE && check_mutation(TENDRIL_HAIR)){
-				pline("Dirge holds onto your hands!");
-				where_to = 0;
-		    }
-		    
-		    if (!where_to) {
-				pline_The("whip slips free.");  /* not `The_whip' */
-				return 1;
-		    } else if (where_to == 3 && hates_silver(mtmp->data) && (obj_is_material(obj, SILVER))) {
-				/* this monster won't want to catch a silver
-				   weapon; drop it at hero's feet instead */
-				where_to = 2;
-		    } else if (where_to == 3 && hates_iron(mtmp->data) && is_iron_obj(obj)) {
-				/* this monster won't want to catch an iron
-				   weapon; drop it at hero's feet instead */
-				where_to = 2;
-		    } else if (where_to == 3 && hates_unholy_mon(mtmp) && obj_is_material(obj, GREEN_STEEL)) {
-				/* this monster won't want to catch a green-steel
-				   weapon; drop it at hero's feet instead */
-				where_to = 2;
-		    } else if (where_to == 3 && hates_unholy_mon(mtmp) && is_unholy(obj)) {
-				/* this monster won't want to catch a cursed
-				   weapon; drop it at hero's feet instead */
-				where_to = 2;
-		    } else if (where_to == 3 && hates_unblessed_mon(mtmp) && is_unblessed(obj)) {
-				/* this monster won't want to catch an uncursed
-				   weapon; drop it at hero's feet instead */
-				where_to = 2;
-		    } else if (where_to == 3 && hates_holy_mon(mtmp) && is_holy(obj)) {
-				/* this monster won't want to catch a blessed
-				   weapon; drop it at hero's feet instead */
-				where_to = 2;
-		    }
-		    
-		    
-		    freeinv(obj);
-		    uwepgone();
-		    switch (where_to) {
-			case 1:		/* onto floor beneath mon */
-			    pline("%s yanks %s from your %s!", Monnam(mtmp),
-				  the_weapon, hand);
-			    place_object(obj, mtmp->mx, mtmp->my);
-			    break;
-			case 2:		/* onto floor beneath you */
-			    pline("%s yanks %s to the %s!", Monnam(mtmp),
-				  the_weapon, surface(u.ux, u.uy));
-			    dropy(obj);
-			    break;
-			case 3:		/* into mon's inventory */
-			    pline("%s snatches %s!", Monnam(mtmp),
-				  the_weapon);
-			    (void) mpickobj(mtmp,obj);
-			    break;
-		    }
-		    return 1;
-		}
-		return 0;
+		return mon_whip_tricks(mtmp, &youmonst, uwep);
 	case MUSE_SCR_REMOVE_CURSE:
 		mreadmsg(mtmp, otmp);
 		if (canseemon(mtmp))

@@ -93,6 +93,20 @@ const struct icp hellprobs[] = {
 { 1, SANCTION_CLASS}
 };
 
+const struct icp hellboxiprobs[] = {
+{23, GEM_CLASS},
+{ 5, BELT_CLASS},
+{ 5, FOOD_CLASS},
+{ 1, POTION_CLASS},
+{14, SCROLL_CLASS},
+{ 9, SANCTION_CLASS},
+{ 2, SPBOOK_CLASS},
+{12, COIN_CLASS},
+{11, WAND_CLASS},
+{10, RING_CLASS},
+{ 8, AMULET_CLASS}
+};
+
 /* Object material probabilities.*/
 /* for objects which are normally iron or metal */
 static const struct icp metal_materials[] = {
@@ -456,24 +470,24 @@ struct obj *box;
 			otmp->age = 0L;
 			stop_corpse_timers(otmp);
 	    } else if(box->otyp == MASSIVE_STONE_CRATE){
-			if (!(otmp = mkobj(FOOD_CLASS, TRUE))) continue;
+			if (!(otmp = mkobj(FOOD_CLASS, MKOBJ_ARTIF))) continue;
 	    } else if(box->otyp == WRITING_DESK){
 			if(rn2(4)){
-				if (!(otmp = mkobj(SCROLL_CLASS, TRUE))) continue;
+				if (!(otmp = mkobj(SCROLL_CLASS, MKOBJ_ARTIF))) continue;
 			}
 			else if(rn2(4)){
 				if (!(otmp = mksobj(SCR_BLANK_PAPER, MKOBJ_NOINIT))) continue;
 			}
 			else {
-				if (!(otmp = mkobj(SPBOOK_CLASS, TRUE))) continue;
+				if (!(otmp = mkobj(SPBOOK_CLASS, MKOBJ_ARTIF))) continue;
 			}
 	    } else {
 		register int tprob;
-		const struct icp *iprobs = boxiprobs;
+		const struct icp *iprobs = Inhell ? hellboxiprobs : boxiprobs;
 
 		for (tprob = rnd(100); (tprob -= iprobs->iprob) > 0; iprobs++)
 		    ;
-		if (!(otmp = mkobj(iprobs->iclass, TRUE))) continue;
+		if (!(otmp = mkobj(iprobs->iclass, MKOBJ_ARTIF))) continue;
 
 		/* handle a couple of special cases */
 		if (otmp->oclass == COIN_CLASS) {
@@ -492,9 +506,9 @@ struct obj *box;
 		}
 		if (box->otyp == BAG_OF_HOLDING) {
 		    if (Is_mbag(otmp)) {
-			otmp->otyp = SACK;
-			otmp->spe = 0;
-			otmp->owt = weight(otmp);
+				otmp->otyp = SACK;
+				otmp->spe = 0;
+				otmp->owt = weight(otmp);
 		    } else while (otmp->otyp == WAN_CANCELLATION)
 			    otmp->otyp = rnd_class(WAN_LIGHT, WAN_LIGHTNING);
 		}
@@ -1812,6 +1826,12 @@ int mkflags;
 	    flags.made_life = TRUE;
 	if (otyp == WORD_OF_KNOWLEDGE)
 	    flags.made_know = TRUE;
+
+	if ((otmp->oclass == SPBOOK_CLASS || otmp->oclass == SCROLL_CLASS)
+		&& otmp->otyp != SPE_BLANK_PAPER && otmp->otyp != SCR_BLANK_PAPER
+		&& tactile_quest_book(otmp)
+	)
+		add_oprop(otmp, OPROP_TACTB);
 	
 	fix_object(otmp);
 	return(otmp);
@@ -1917,6 +1937,7 @@ start_corpse_timeout(body)
 		|| body->corpsenm == PM_LICHEN
 		|| body->corpsenm == PM_CROW_WINGED_HALF_DRAGON
 		|| body->corpsenm == PM_BEHOLDER
+		|| body->corpsenm == PM_DEATH_BEHOLDER
 		|| body->spe
 	) return;
 	
@@ -3045,8 +3066,8 @@ register struct obj *obj;
 		return eaten_stat((int)obj->quan * wt, obj);
 	} else if (obj->oclass == COIN_CLASS)
 		return (int)((obj->quan + 50L) / 100L);
-	else if (obj->otyp == BALL && obj->owt != 0)
-		return((int)(obj->owt));	/* kludge for "very" heavy iron ball */
+	else if (obj->otyp == BALL)
+		return (int)(wt + obj->ovar1_heavy_ball);
 	return((wt || obj->oartifact) ? wt*(int)obj->quan : ((int)obj->quan + 1)>>1);
 }
 
@@ -3158,6 +3179,7 @@ int x, y;
 				|| ((num) == PM_LICHEN)		\
 				|| ((num) == PM_CROW_WINGED_HALF_DRAGON)		\
 				|| ((num) == PM_BEHOLDER)		\
+				|| ((num) == PM_DEATH_BEHOLDER)		\
 				|| (is_rider(&mons[num]))	\
 				|| (mons[num].mlet == S_TROLL))
 

@@ -80,8 +80,13 @@ boolean active;
 
 	/* some creatures are limited in *where* they can attack */
 	/* Grid bugs and Bebeliths cannot attack at an angle. */
-	if ((pa->mtyp == PM_GRID_BUG || pa->mtyp == PM_BEBELITH)
+	if (orthogonal_mover(pa)
 		&& x(magr) != tarx && y(magr) != tary)
+		return FALSE;
+
+	/* Sea raiders and Sea priests can only attack at an angle. */
+	if (diagonal_mover(pa)
+		&& (x(magr) == tarx || y(magr) == tary))
 		return FALSE;
 
 	/* limited attack angles (monster-agressor only) */
@@ -612,6 +617,82 @@ register struct monst *magr, *mdef;
 		return MM_MISS;
 
 	return xattacky(magr, mdef, mdef->mx, mdef->my, 0L);
+}
+
+/* mdisplacem() -- attacker moves defender out of the way;
+ *                 returns same result bits as mattackm().
+ */
+int
+mdisplacem(struct monst *magr, struct monst *mdef, boolean quietly)
+{
+	struct permonst *pa, *pd;
+	int tx, ty, fx, fy;
+	boolean vis;
+
+	if (!magr || !mdef || magr == mdef)
+		return MM_MISS;
+	pa = magr->data, pd = mdef->data;
+	tx = mdef->mx, ty = mdef->my; /* destination */
+	fx = magr->mx, fy = magr->my; /* current location */
+	if (m_at(fx, fy) != magr || m_at(tx, ty) != mdef)
+		return MM_MISS;
+
+	if (!rn2(7))
+		return MM_MISS;
+
+	if (orthogonal_mover(pa)
+		&& magr->mx != mdef->mx && magr->my != mdef->my)
+		return MM_MISS;
+
+	if (diagonal_mover(pa)
+		&& (magr->mx == mdef->mx || magr->my == mdef->my))
+		return MM_MISS;
+
+	mdef->mundetected = 0;
+	mdef->msleeping = 0;
+	mdef->mstrategy &= ~STRAT_WAITMASK;
+
+	vis = (canspotmon(magr) && canspotmon(mdef));
+
+	if (touch_petrifies(pd) && !resists_ston(magr)) {
+		if (!which_armor(magr, W_ARMG)) {
+			if (poly_when_stoned(pa)) {
+				mon_to_stone(magr);
+				return MM_HIT; /* no damage during the polymorph */
+			}
+			if (!quietly && canspotmon(magr)) {
+				if (vis)
+					pline("%s tries to move %s out of %s way.", Monnam(magr),
+						  mon_nam(mdef), is_rider(pa) ? "the" : mhis(magr));
+				pline("%s turns to stone!", Monnam(magr));
+			}
+			monstone(magr);
+			if (!DEADMONSTER(magr))
+				return MM_HIT; /* lifesaved */
+			return MM_AGR_DIED;
+		}
+	}
+
+	remove_monster(fx, fy); /* pick up from orig position */
+	if (mdef->wormno)
+		remove_worm(mdef);
+	else
+		remove_monster(tx, ty);
+	place_monster(magr, tx, ty); /* put down at target spot */
+	place_monster(mdef, fx, fy);
+	if (mdef->wormno) /* now put down tail */
+		place_worm_tail_randomly(mdef, fx, fy);
+	update_monster_region(magr);
+	update_monster_region(mdef);
+
+	if (vis && !quietly)
+		pline("%s moves %s out of %s way!", Monnam(magr), mon_nam(mdef),
+			  is_rider(pa) ? "the" : mhis(magr));
+	newsym(fx, fy);
+	newsym(tx, ty);
+	flush_screen(0);
+
+	return MM_HIT;
 }
 
 /* fightm()  -- mtmp fights some other monster
@@ -1699,12 +1780,29 @@ struct obj * obj;
 	return FALSE;
 }
 
+/* die size for platinum/lawful-hating damage against [mdef] */
+int
+platinum_diesize(struct monst *mdef)
+{
+	boolean youdef = (mdef == &youmonst);
+	int diesize = 5;
+
+	/* spiritual beings are hurt more */
+	if (is_minion(mdef->data) || is_demon(mdef->data))
+		diesize *= 2;
+	/* strongly chaotic beings are hurt more */
+	if (youdef ? u.ualign.record >= 100 : (mdef->mtyp == PM_ANGEL || mdef->data->maligntyp <= -10))
+		diesize *= 2;
+
+	return diesize;
+}
+
 /* hatesobjdmg()
- * 
+ *
  * Calculates a damage roll from [mdef] being seared by [otmp]
  * Counts silver, jade, iron, holy, unholy
  * Does not print messages
- * 
+ *
  */
 int
 hatesobjdmg(mdef, otmp, magr)
@@ -1878,6 +1976,15 @@ struct monst * magr;
 			((otmp->otyp != CHURCH_SHORTSWORD && (!amalg_otyp || amalg_otyp != CHURCH_SHORTSWORD)) || !(resist_pierce(pd) && !resist_slash(pd)))
 		)
 			diesize *= otmp->otyp == CHURCH_SHORTSWORD && Insight >= 40 ? 5 : 2.5;
+
+		//Late adjustments (increase dice and double previous damage)
+		if(magr && is_undead(mdef->data) && CHECK_ETRAIT(otmp, magr, ETRAIT_ANTI_UNDEAD)
+			&& ROLL_ETRAIT(otmp, magr, TRUE, (youagr && ZFOCUS(otmp)) ? rn2(4) : rn2(2))
+		) {
+			holydmg *= 2;
+			ndice *= 2;
+		}
+
 		/* calculate dice */
 		holydmg += vd(ndice, diesize);
 		if(youagr && active_glyph(ROTTED_RUNE) && u.uevent.uhand_of_elbereth){
@@ -1886,7 +1993,9 @@ struct monst * magr;
 		dmg += holydmg;
 	}
 	if (hates_unholy_mon(mdef) &&
-		is_unholy(otmp)) {
+		is_unholy(otmp)
+	) {
+		int unholydmg = 0;
 		/* default: 1d9 */
 		ndice = 1;
 		diesize = 9;
@@ -1974,6 +2083,15 @@ struct monst * magr;
 			((otmp->otyp != CHURCH_SHORTSWORD && (!amalg_otyp || amalg_otyp != CHURCH_SHORTSWORD)) || !(resist_pierce(pd) && !resist_slash(pd)))
 		)
 			diesize *= otmp->otyp == CHURCH_SHORTSWORD && Insight >= 40 ? 5 : 2.5;
+
+		//Late adjustments (increase dice and double previous damage)
+		if(magr && is_undead(mdef->data) && CHECK_ETRAIT(otmp, magr, ETRAIT_ANTI_UNDEAD)
+			&& ROLL_ETRAIT(otmp, magr, TRUE, (youagr && ZFOCUS(otmp)) ? rn2(4) : rn2(2))
+		) {
+			unholydmg *= 2;
+			ndice *= 2;
+		}
+
 		/* calculate */
 		if (ndice)
 			dmg += vd(ndice, diesize);
@@ -2024,13 +2142,7 @@ struct monst * magr;
 	) {
 		/* default: 1d5 */
 		ndice = 1;
-		diesize = 5;
-		/* spiritual beings are hurt more */
-		if(is_minion(mdef->data) || is_demon(mdef->data))
-			diesize *= 2;
-		/* strongly chaotic beings are hurt more */
-		if(youdef ? u.ualign.record >= 100 : ( mdef->mtyp == PM_ANGEL || mdef->data->maligntyp <= -10))
-			diesize *= 2;
+		diesize = platinum_diesize(mdef);
 
 		/* special cases */
 		
@@ -2512,6 +2624,7 @@ int dmgtyp;
 			break;
 			/* Fire boils potions, burns scrolls, burns spellbooks */
 		case AD_FIRE:
+		case AD_SFLM:
 			xresist = (Fire_res(mtmp) && obj->oclass != POTION_CLASS);
 
 			if (obj->oerodeproof && is_flammable(obj))	/* fireproof */

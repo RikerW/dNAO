@@ -2966,6 +2966,8 @@ base_uac()
 	uac -= u.spiritAC;
 	if(u.uuur_duration)
 		uac -= 10;
+	if(youmonst.ruh)
+		uac += 10;
 	uac -= u.uuur/2;
 	if(mvitals[PM_MOON_S_CHOSEN].died){
 		uac += 12;
@@ -3033,13 +3035,19 @@ base_uac()
 		
 		if(dexbonus < -5)
 			dexbonus = -5;
-		
+
+		if(youmonst.mprone && dexbonus > 0)
+			dexbonus = (int)(dexbonus/2);
+
 		if(dexbonus > 0 && uarm && !is_light_armor(uarm)){
 			if(is_medium_armor(uarm))
 				dexbonus = (int)(dexbonus/2);
 			else
 				dexbonus = 0;
 		}
+
+		if(youmonst.mprone)
+			uac += 3;
 	}
 	uac -= dexbonus;
 	if(u.ufirst_sky)

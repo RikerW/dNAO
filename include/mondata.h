@@ -8,6 +8,18 @@
 #define verysmall(ptr)		((ptr)->msize < MZ_SMALL)
 #define bigmonst(ptr)		((ptr)->msize >= MZ_LARGE)
 
+#define orthogonal_mover(ptr)	((ptr)->mtyp == PM_GRID_BUG || (ptr)->mtyp == PM_BEBELITH)
+
+#define sea_person(ptr)		((ptr)->mtyp == PM_SEA_RAIDER || (ptr)->mtyp == PM_SEA_PRIEST)
+
+#define diagonal_mover(ptr)	sea_person(ptr)
+
+/* Diagonal movement never changes the parity of (x+y), so a diagonal_mover is
+   permanently confined to one parity of squares -- the other parity is, from
+   its perspective, a different universe entirely. Monsters without that
+   restriction share a world with every square. */
+#define shared_world(mon,x,y)	(!diagonal_mover(mon) || ((((mon)->mx+(mon)->my) % 2) == (((x)+(y)) % 2)))
+
 #define MON_BAB(mon)		((mon)->data->mflagsf&MF_BAB_FULL ? 1.0 : (mon)->data->mflagsf&MF_BAB_HALF ? .5 : .75)
 
 #define lev_limit_30(ptr)		((ptr)->mflagsf&MF_LEVEL_30)
@@ -105,7 +117,11 @@
 
 #define is_alabaster_mummy(ptr)	((ptr)->mtyp == PM_ALABASTER_MUMMY)
 
+#define has_syllable(ptr)	((ptr)->mtyp == PM_ALABASTER_MUMMY || (ptr)->mtyp == PM_SHRIEKING_SHADOW)
+
 #define is_alabaster_elf(ptr)	((ptr)->mtyp == PM_ALABASTER_ELF || (ptr)->mtyp == PM_ALABASTER_ELF_ELDER || (ptr)->mtyp == PM_DESERT_SEER)
+
+#define hugs_walls(ptr)		((ptr)->mtyp == PM_PARASITIC_WALL_HUGGER || (ptr)->mtyp == PM_SHRIEKING_SHADOW)
 
 #define is_lminion(mon)		(is_minion((mon)->data) && is_lawful_mon(mon))
 
@@ -121,9 +137,15 @@
 #define species_flies(ptr)		(((ptr)->mflagsm & MM_FLY) != 0L)
 #define species_displaces(ptr)	(((ptr)->mflagsg & MG_DISPLACEMENT) != 0L)
 #define species_floats(ptr)		(((ptr)->mflagsm & MM_FLOAT) != 0L)
+#define grounded(mon)			((mon) == &youmonst ? !(Flying || Levitation) \
+								 : !(mon_resistance((mon), FLYING) || mon_resistance((mon), LEVITATION)))
+#define is_trippable(mon)		(mon_body_leg_count(mon) > 0 && grounded(mon))
 #define species_swims(ptr)		(((ptr)->mflagsm & MM_SWIM) != 0L)
 #define species_tears_webs(ptr)		(((ptr)->mflagsm & MM_WEBRIP) != 0L)
 #define species_busts_doors(ptr)		(((ptr)->mflagsm & MM_DOORBUST) != 0L)
+/* barges past a smaller/weaker monster in its way rather than attacking it;
+   unrelated to species_displaces()/MG_DISPLACEMENT (Cloak of Displacement) */
+#define is_displacer(ptr)		(((ptr)->mflagsm & MM_DISPLACES) != 0L)
 #define is_suicidal(ptr)		(is_fern_spore(ptr) || \
 					(ptr)->mtyp == PM_SPHERE_OF_FORCE || \
 					(ptr)->mtyp == PM_FREEZING_SPHERE || \
@@ -267,6 +289,7 @@
 						 ((ptr)->mtyp == PM_PHARAOH) \
 						)
 #define skeleton_innards(ptr)	(((ptr)->mflagsc&MC_SKELETAL) != 0)
+#define skeletal(ptr)		((ptr)->mflagsc&MC_SKELETAL)
 #define no_innards(ptr)	((ptr)->mlet == S_VORTEX || \
 						 (ptr)->mlet == S_LIGHT || \
 						 (ptr)->mlet == S_ELEMENTAL || \
@@ -383,7 +406,7 @@
 								((ptr)->mlet != S_JELLY) && ((ptr)->mlet != S_BLOB) && !is_elemental(ptr) &&\
 								!is_plant(ptr) && !is_demon(ptr) && !is_great_old_one(ptr) && !is_primordial(ptr) && !(mvitals[monsndx(ptr)].mvflags&G_NOCORPSE))
 #define is_lich(ptr)			((ptr)->mlet == S_LICH)
-#define is_weldproof(ptr)		(is_undead(ptr) || (is_demon(ptr) && !is_tiefling_mtyp((ptr)->mtyp)) || is_were(ptr) || is_great_old_one(ptr) || is_android(ptr) || ptr->mtyp == PM_DAUGHTER_OF_NAUNET || ptr->mtyp == PM_PARASITIC_WALL_HUGGER)
+#define is_weldproof(ptr)		(is_undead(ptr) || (is_demon(ptr) && !is_tiefling_mtyp((ptr)->mtyp)) || is_were(ptr) || is_great_old_one(ptr) || is_android(ptr) || (ptr)->mtyp == PM_DAUGHTER_OF_NAUNET || (ptr)->mtyp == PM_PARASITIC_WALL_HUGGER)
 #define is_weldproof_mon(mon)		(is_weldproof((mon)->data))
 #define is_were(ptr)		(((ptr)->mflagsa & MA_WERE) != 0L)
 #define is_heladrin(ptr)		(\
@@ -1003,7 +1026,7 @@
 #define is_thief(ptr)		( dmgtype(ptr, AD_SGLD)  || dmgtype(ptr, AD_SITM) || dmgtype(ptr, AD_SEDU) )
 #define is_magical(ptr)		( attacktype(ptr, AT_MMGC) || attacktype(ptr, AT_MAGC) )
 #define nospellcooldowns(ptr)	((((ptr)->mflagsg & MG_NOSPELLCOOLDOWN) != 0L) || ((ptr)->mtyp == PM_TWIN_SIBLING && check_mutation(SHUB_RADIANCE)))
-#define nospellcooldowns_mon(mtmp)	(nospellcooldowns((mtmp)->data) || (is_alabaster_mummy((mtmp)->data) && (mtmp)->mvar_syllable == SYLLABLE_OF_THOUGHT__NAEN) || (mtmp)->mstance == MSTANCE_MAGIC)
+#define nospellcooldowns_mon(mtmp)	(nospellcooldowns((mtmp)->data) || (has_syllable((mtmp)->data) && (mtmp)->mvar_syllable == SYLLABLE_OF_THOUGHT__NAEN) || (mtmp)->mstance == MSTANCE_MAGIC)
 #define is_lord(ptr)		(((ptr)->mflagsg & MG_LORD) != 0L)
 #define is_prince(ptr)		(((ptr)->mflagsg & MG_PRINCE) != 0L)
 #define is_normal_demon(ptr)		(is_demon(ptr) && \
@@ -1099,7 +1122,8 @@
    Maximum allowable lightsource radius is currently 10 (30 after 3x lowlight modifier) */
 #define emits_light(ptr)	((ptr)->light_radius)
 
-#define emits_light_mon(mon) (emits_light((mon)->data))
+/* light radius of a monster right now: 0 while its light-emitting cells are exhausted */
+#define emits_light_mon(mon) (get_timer((mon)->timed, LIGHT_EXHAUSTED) ? 0 : emits_light((mon)->data))
 
 /*	The Voice casts light */
 #define Is_darklight_monster(ptr)	((ptr)->mtyp == PM_EDDERKOP\
@@ -1605,6 +1629,7 @@
 #define	hamWarded(data)	(is_auton(data) \
 			|| data->mtyp == PM_FLOATING_EYE \
 			|| data->mtyp == PM_BEHOLDER \
+			|| data->mtyp == PM_DEATH_BEHOLDER \
 			|| data->mtyp == PM_APHANACTONAN_ASSESSOR \
 			|| data->mtyp == PM_EYE_OF_DOOM \
 			|| data->mtyp == PM_MANY_EYED_SEEKER \

@@ -2994,6 +2994,19 @@ long wp_mask;
 			else if (on) *mask |= wp_mask;
 			else *mask &= ~wp_mask;
 			break;
+		case FLYING:
+			{
+				boolean was_flying = Flying;
+				if (on) *mask |= wp_mask;
+				else *mask &= ~wp_mask;
+				if (!restoring) {
+					if (on && !was_flying && !Levitation)
+						float_up();
+					else if (!on && was_flying && !Flying && !Levitation)
+						(void) float_down(0L, 0L);
+				}
+			}
+			break;
 		/* everything else (that are in uprops) */
 		default:
 			if (on) *mask |= wp_mask;
@@ -4184,7 +4197,7 @@ voidPen_hit(struct monst *magr, struct monst *mdef, struct obj *pen, int *dmgptr
 	if (pen->ovara_seals&SEAL_HUGINN_MUNINN){
 		if(youdefend){
 			if(!Blind){
-				make_blinded(Blinded+1L,FALSE);
+				make_blinded(BlindedTimeout+1L,FALSE);
 				*dmgptr += d(dnum,4);
 			}
 		}
@@ -4358,7 +4371,7 @@ voidPen_hit(struct monst *magr, struct monst *mdef, struct obj *pen, int *dmgptr
 			make_stunned((HStun + 5), FALSE);
 			if(mvitals[PM_ACERERAK].died > 0) *dmgptr += d(2,4);
 		}
-		else if(mdef->mcansee && haseyes(mdef->data)){
+		else if(!is_blind(mdef) && haseyes(mdef->data)){
 			pline("%s is dazzled by prismatic feathers!", Monnam(mdef));
 			mdef->mstun = 1;
 			mdef->mconf = 1;
@@ -5772,71 +5785,88 @@ struct obj *otmp;
 	if (proficient > 3) proficient = 3;
 
 	if (youagr && !youdef) {
-		/* player attacks monster: try to disarm it */
+		/* player attacks monster: try to disarm or trip it */
+		boolean trippable = could_trip(magr, mdef);
 		struct obj *mwep = rn2(3) ? MON_WEP(mdef) : MON_SWEP(mdef);
-		if (!mwep) return;
+		boolean trip = (mwep && trippable) ? (boolean) rn2(2) : trippable;
 
-		char onambuf[BUFSZ];
-		const char *mon_hand = mbodypart(mdef, HAND);
-		boolean gotit = proficient && (!Fumbling || !rn2(10));
+		if (!mwep && !trip) return;
 
-		if (bimanual_mon(mwep, mdef)) mon_hand = makeplural(mon_hand);
-		Strcpy(onambuf, cxname(mwep));
+		if (trip) {
+			You("lash the glaive's %s around %s %s!",
+			    pg_appendage_name(otmp, PGD_SNAGGING),
+			    s_suffix(mon_nam(mdef)), mbodypart(mdef, LEG));
+			if (trip_attempt(magr, mdef, proficient) == TRIP_FAIL)
+				pline("But the %s slip free!", pg_appendage_name(otmp, PGD_SNAGGING));
+			wakeup(mdef, TRUE);
+		} else {
+			char onambuf[BUFSZ];
+			const char *mon_hand = mbodypart(mdef, HAND);
+			boolean gotit = proficient && (!Fumbling || !rn2(10));
 
-		You("wrap the glaive's %s around %s %s.",
-		    pg_appendage_name(otmp, PGD_SNAGGING),
-		    s_suffix(mon_nam(mdef)), onambuf);
+			if (bimanual_mon(mwep, mdef)) mon_hand = makeplural(mon_hand);
+			Strcpy(onambuf, cxname(mwep));
 
-		if (gotit && mwep->cursed && !is_weldproof_mon(mdef)) {
-			pline("%s welded to %s %s%c",
-			    (mwep->quan == 1L) ? "It is" : "They are",
-			    mhis(mdef), mon_hand,
-			    !mwep->bknown ? '!' : '.');
-			mwep->bknown = 1;
-			gotit = FALSE;
-		}
-		if (gotit) {
-			obj_extract_self(mwep);
-			possibly_unwield(mdef, FALSE);
-			setmnotwielded(mdef, mwep);
-			IMPURITY_UP(u.uimp_theft)
-			switch (rn2(proficient + 1)) {
-			case 3:
-				if(!u.uavoid_theft){
+			You("wrap the glaive's %s around %s %s.",
+			    pg_appendage_name(otmp, PGD_SNAGGING),
+			    s_suffix(mon_nam(mdef)), onambuf);
+
+			if (gotit) {
+				int roll = rn2(proficient + 1);
+				int where_to = (roll == 3) ? WHIPDISARM_ATTACKERINV
+						: (roll == 2) ? WHIPDISARM_ATTACKERFEET
+						: WHIPDISARM_DEFENDERFEET;
+				int result = whip_disarm(magr, mdef, mwep, where_to);
+
+				if (result > 0) IMPURITY_UP(u.uimp_theft)
+				switch (result) {
+				case WHIPDISARM_WELD:
+					pline("%s welded to %s %s%c",
+					    (mwep->quan == 1L) ? "It is" : "They are",
+					    mhis(mdef), mon_hand,
+					    !mwep->bknown ? '!' : '.');
+					break;
+				case WHIPDISARM_GLAMDRING:
+					pline("Glamdring resists being ripped out of %s %s!",
+					    s_suffix(mon_nam(mdef)), mon_hand);
+					break;
+				case WHIPDISARM_ATTACKERINV:
 					You("snatch %s %s!", s_suffix(mon_nam(mdef)), onambuf);
-					mwep = hold_another_object(mwep, "You drop %s!",
-						doname(mwep), (const char *)0);
+					break;
+				case WHIPDISARM_ATTACKERFEET:
+					You("yank %s %s to the %s!",
+					    s_suffix(mon_nam(mdef)), onambuf,
+					    surface(u.ux, u.uy));
+					break;
+				case WHIPDISARM_DEFENDERFEET:
+					You("yank %s from %s %s!",
+					    the(onambuf), s_suffix(mon_nam(mdef)), mon_hand);
 					break;
 				}
-			case 2:
-				You("yank %s %s to the %s!",
-				    s_suffix(mon_nam(mdef)), onambuf,
-				    surface(u.ux, u.uy));
-				place_object(mwep, u.ux, u.uy);
-				stackobj(mwep);
-				break;
-			default:
-				You("yank %s from %s %s!",
-				    the(onambuf), s_suffix(mon_nam(mdef)), mon_hand);
-				obj_no_longer_held(mwep);
-				place_object(mwep, mdef->mx, mdef->my);
-				stackobj(mwep);
-				break;
+			} else {
+				pline("The %s slip free.", pg_appendage_name(otmp, PGD_SNAGGING));
+				wakeup(mdef, TRUE);
 			}
-		} else {
-			pline("The %s slip free.", pg_appendage_name(otmp, PGD_SNAGGING));
 		}
-		wakeup(mdef, TRUE);
 
 	} else if (!youagr && youdef) {
-		/* monster attacks player: MUSE_BULLWHIP-style disarm */
+		/* monster attacks player: MUSE_BULLWHIP-style disarm/trip */
 		boolean gotit = proficient && !rn2(5 - proficient);
-		if (!gotit) return;
-		if (!uwep) return;
-
-		struct obj *obj = uwep;
-		const char *appname = pg_appendage_name(otmp, PGD_SNAGGING);
+		boolean trippable;
+		struct obj *obj;
+		boolean trip;
+		const char *appname;
 		char The_antennae[BUFSZ], the_antennae[BUFSZ];
+
+		if (!gotit) return;
+
+		trippable = could_trip(magr, mdef);
+		obj = uwep;
+		trip = (obj && trippable) ? (boolean) rn2(2) : trippable;
+
+		if (!obj && !trip) return;
+
+		appname = pg_appendage_name(otmp, PGD_SNAGGING);
 		if (vismagr) {
 			Sprintf(The_antennae, "The glaive's %s", appname);
 			Sprintf(the_antennae, "the glaive's %s", appname);
@@ -5845,96 +5875,90 @@ struct obj *otmp;
 			Sprintf(The_antennae, "%s", appname);
 			The_antennae[0] = highc(The_antennae[0]);
 		}
-		const char *hand = body_part(HAND);
-		char the_weapon[BUFSZ];
-		int where_to;
 
-		if (bimanual_mon(obj, &youmonst)) hand = makeplural(hand);
-		Strcpy(the_weapon, the(xname(obj)));
+		if (trip) {
+			if (vismagr)
+				pline("%s lashes %s towards your %s!", Monnam(magr),
+				    the_antennae, body_part(LEG));
+			if (trip_attempt(magr, mdef, proficient) == TRIP_FAIL)
+				pline("But %s slip%s free!", the_antennae, vismagr ? "" : "s");
+		} else {
+			const char *hand = body_part(HAND);
+			char the_weapon[BUFSZ];
+			int where_to;
 
-		if (vismagr)
-			pline("%s lashes %s towards your %s!", Monnam(magr), the_antennae, hand);
+			if (bimanual_mon(obj, &youmonst)) hand = makeplural(hand);
+			Strcpy(the_weapon, the(xname(obj)));
 
-		if (obj->otyp == BALL) {
-			pline("%s fail%s to wrap around %s.", The_antennae,
-			    vismagr ? "" : "s", the_weapon);
-			return;
-		}
+			if (vismagr)
+				pline("%s lashes %s towards your %s!", Monnam(magr), the_antennae, hand);
 
-		if (obj->oartifact)
-			pline("%s wrap%s around your wielded %s!", The_antennae,
-			    vismagr ? "" : "s", the_weapon);
-		else
-			pline("%s wrap%s around %s you're wielding!", The_antennae,
-			    vismagr ? "" : "s", the_weapon);
+			if (obj->otyp == BALL) {
+				pline("%s fail%s to wrap around %s.", The_antennae,
+				    vismagr ? "" : "s", the_weapon);
+				return;
+			}
 
-		where_to = rn2(proficient + 2);	/* 0 = slip; 1..3 = outcomes */
-		if (where_to > 3) where_to = 3;
+			if (obj->oartifact)
+				pline("%s wrap%s around your wielded %s!", The_antennae,
+				    vismagr ? "" : "s", the_weapon);
+			else
+				pline("%s wrap%s around %s you're wielding!", The_antennae,
+				    vismagr ? "" : "s", the_weapon);
 
-		if (welded(obj)) {
-			pline("%s welded to your %s%c",
-			    !is_plural(obj) ? "It is" : "They are",
-			    hand, !obj->bknown ? '!' : '.');
-			where_to = 0;
-		}
-		if (obj->oartifact == ART_GLAMDRING) {
-			pline("Glamdring resists being ripped out of your hands!");
-			where_to = 0;
-		}
-		if (obj->oartifact == ART_DIRGE && check_mutation(TENDRIL_HAIR)) {
-			pline("Dirge holds onto your hands!");
-			where_to = 0;
-		}
-		if (!where_to) {
-			pline("The %s slip free.", appname);
-			return;
-		}
-		/* material aversions redirect to floor under player */
-		if (where_to == 3) {
-			if (hates_silver(magr->data) && obj_is_material(obj, SILVER))
-				where_to = 2;
-			else if (hates_iron(magr->data) && is_iron_obj(obj))
-				where_to = 2;
-			else if (hates_unholy_mon(magr) && obj_is_material(obj, GREEN_STEEL))
-				where_to = 2;
-			else if (hates_unholy_mon(magr) && is_unholy(obj))
-				where_to = 2;
-			else if (hates_unblessed_mon(magr) && is_unblessed(obj))
-				where_to = 2;
-			else if (hates_holy_mon(magr) && is_holy(obj))
-				where_to = 2;
-		}
-		freeinv(obj);
-		uwepgone();
-		switch (where_to) {
-		case 1:	/* floor under monster */
-			pline("%s yanks %s from your %s!", Monnam(magr), the_weapon, hand);
-			place_object(obj, magr->mx, magr->my);
-			break;
-		case 2:	/* floor under player */
-			pline("%s yanks %s to the %s!", Monnam(magr),
-			    the_weapon, surface(u.ux, u.uy));
-			dropy(obj);
-			break;
-		case 3:	/* into monster's inventory */
-			pline("%s snatches %s!", Monnam(magr), the_weapon);
-			(void) mpickobj(magr, obj);
-			break;
+			where_to = rn2(proficient + 2);	/* 0 = slip; 1..3 = outcomes */
+			if (where_to > 3) where_to = 3;
+
+			if (where_to) {
+				int result = whip_disarm(magr, mdef, obj, where_to);
+
+				switch (result) {
+				case WHIPDISARM_WELD:
+					pline("%s welded to your %s%c",
+					    !is_plural(obj) ? "It is" : "They are",
+					    hand, !obj->bknown ? '!' : '.');
+					break;
+				case WHIPDISARM_GLAMDRING:
+					pline("Glamdring resists being ripped out of your hands!");
+					break;
+				case WHIPDISARM_DIRGE:
+					pline("Dirge holds onto your hands!");
+					break;
+				case WHIPDISARM_ATTACKERFEET:
+					pline("%s yanks %s from your %s!", Monnam(magr), the_weapon, hand);
+					break;
+				case WHIPDISARM_DEFENDERFEET:
+					pline("%s yanks %s to the %s!", Monnam(magr),
+					    the_weapon, surface(u.ux, u.uy));
+					break;
+				case WHIPDISARM_ATTACKERINV:
+					pline("%s snatches %s!", Monnam(magr), the_weapon);
+					break;
+				}
+				if (result < 0) where_to = 0;
+			}
+
+			if (!where_to) {
+				pline("The %s slip free.", appname);
+			}
 		}
 
 	} else if (!youagr && !youdef) {
-		/* monster vs monster: simplified disarm */
+		/* monster vs monster: simplified disarm/trip */
+		boolean trippable = could_trip(magr, mdef);
 		struct obj *mwep = rn2(3) ? MON_WEP(mdef) : MON_SWEP(mdef);
-		if (!mwep) return;
-		if (proficient && !rn2(2)) {
-			obj_extract_self(mwep);
-			possibly_unwield(mdef, FALSE);
-			setmnotwielded(mdef, mwep);
-			obj_no_longer_held(mwep);
-			place_object(mwep, mdef->mx, mdef->my);
-			stackobj(mwep);
+		boolean trip = (mwep && trippable) ? (boolean) rn2(2) : trippable;
+
+		if (!mwep && !trip) return;
+
+		if (trip) {
+			(void) trip_attempt(magr, mdef, proficient);
+			wakeup(mdef, TRUE);
+		} else if (proficient && !rn2(2)) {
+			(void) whip_disarm(magr, mdef, mwep, WHIPDISARM_DEFENDERFEET);
+		} else {
+			wakeup(mdef, TRUE);
 		}
-		wakeup(mdef, TRUE);
 	}
 }
 
@@ -6418,6 +6442,16 @@ boolean direct_weapon;
 	if((otmp->otyp == CHURCH_HAMMER || amalg_otyp == CHURCH_HAMMER) && !youdef && mdef && get_mx(mdef, MX_ESUM)){
 		*truedmgptr += 10*Insight;
 	}
+	//Discourage mortals
+	if((otmp->otyp == HAMMER_OF_ETERNITY || amalg_otyp == HAMMER_OF_ETERNITY) && mdef && (youdef || mortal_race(mdef))){
+		int skill_bonus = youagr ? weapon_dam_bonus(otmp, weapon_type(otmp))
+					  : mon_weapon_dam_bonus(magr->data, otmp, weapon_type(otmp));
+		if(skill_bonus < 0); //Do nothing
+		else if(youdef)
+			u.uencouraged = min(max(u.uencouraged-skill_bonus, -skill_bonus), u.uencouraged);
+		else 
+			mdef->encouraged = min(max(mdef->encouraged-skill_bonus, -skill_bonus), mdef->encouraged);
+	}
 
 	//Flogging raises sanity (note: this is "backwards" on purpose)
 	if(((otmp->otyp == CANE || amalg_otyp == CANE) && !youdef && mdef && is_serration_vulnerable(mdef) && Insight >= rnd(100))
@@ -6716,6 +6750,47 @@ boolean direct_weapon;
 	/* PG_BULLWHIP: pest glaive antennae attempt to disarm the defender */
 	if (otmp->otyp == PEST_GLAIVE && (otmp->ovar1_pestglaive_props & PG_BULLWHIP) && mdef)
 		pg_bullwhip_hit(magr, mdef, otmp);
+}
+
+/* disintegrates/damages up to [i] pieces of mdef's worn armor; returns the remaining budget */
+int
+silver_flame_disn_armor(struct monst *mdef, int i, boolean vis, struct obj *msgr, boolean *messaged)
+{
+	struct obj *obj;
+	boolean youdef = (mdef == &youmonst);
+	boolean printed = FALSE;
+
+	while ((obj = some_armor(mdef)) && i > 0) {
+		i -= 1;
+		if (oresist_disintegration(obj))
+			continue;//May possibly sellect a different item next time.
+
+		if (!((youdef && Preservation)
+			|| (!youdef && mon_resistance(mdef, PRESERVATION))
+		)) {
+			if (vis && !printed) {
+				if (msgr)
+					pline("%s disintegrates %s armor!",
+						The(xname(msgr)),
+						(youdef ? "your" : s_suffix(mon_nam(mdef)))
+						);
+				else
+					pline("The silverfire disintegrates %s armor!",
+						(youdef ? "your" : s_suffix(mon_nam(mdef)))
+						);
+				if (messaged)
+					*messaged = TRUE;
+				printed = TRUE;
+			}
+			if (obj->spe > -1 * objects[(obj)->otyp].a_ac) {
+				damage_item(obj);
+			}
+			else if (!obj->oartifact) {
+				destroy_marm(mdef, obj);
+			}
+		}
+	}
+	return i;
 }
 
 /* returns MM_style hitdata now, and is used for both artifacts and weapon properties */
@@ -7724,7 +7799,7 @@ boolean printmessages; /* print generic elemental damage messages */
 		rnd_tmp = rn2(5) + otmp->spe;
 		if (rnd_tmp<2) rnd_tmp = 2;
 		if (youdef) {
-			make_blinded(Blinded + rnd_tmp, FALSE);
+			make_blinded(BlindedTimeout + rnd_tmp, FALSE);
 			if (!Blind) Your1(vision_clears);
 		}
 		else {
@@ -8672,33 +8747,8 @@ boolean printmessages; /* print generic elemental damage messages */
 
 	/* Reveal unworthy */
 	if (check_oprop(otmp, OPROP_SFUWW) && !(youagr && FLAME_BAD) && (is_minion(pd) || is_demon(pd) || (Drain_res(mdef) && (youdef ? Mortal_race : mortal_race(mdef))))){
-		struct obj *obj;
 		int i = (basedmg+1)/2;
-		boolean printed = FALSE;
-		while((obj = some_armor(mdef)) && i > 0){
-			i-=1;
-			if(oresist_disintegration(obj))
-				continue;//May possibly sellect a different item next time.
-
-			if(!((youdef && Preservation)
-				|| (!youdef && mon_resistance(mdef, PRESERVATION))
-			)){
-				if (vis && !printed) {
-					pline("%s disintegrates %s armor!",
-						The(xname(msgr)),
-						(youdef ? "your" : s_suffix(mon_nam(mdef)))
-						);
-					*messaged = TRUE;
-					printed = TRUE;
-				}
-				if (obj->spe > -1 * objects[(obj)->otyp].a_ac){
-					damage_item(obj);
-				}
-				else if (!obj->oartifact){
-					destroy_marm(mdef, obj);
-				}
-			}
-		}
+		i = silver_flame_disn_armor(mdef, i, vis, msgr, messaged);
 		//Note: i may be as low as -2.
 		if(i > 0){
 			if(2*i >= basedmg)
@@ -10754,7 +10804,7 @@ arti_invoke(obj)
 		int healamt = (maybe_polyd(u.mhmax - u.mh, u.uhpmax - u.uhp) + 1) / 2;
 	    long creamed = (long)u.ucreamed;
 
-	    if (healamt || Sick || Slimed || Blinded > creamed)
+	    if (healamt || Sick || Slimed || BlindedTimeout > creamed)
 		You_feel("better.");
 	    else
 		goto nothing_special;
@@ -10764,7 +10814,7 @@ arti_invoke(obj)
 	    }
 	    if(Sick) make_sick(0L,(char *)0,FALSE,SICK_ALL);
 	    if(Slimed) Slimed = 0L;
-	    if (Blinded > creamed) make_blinded(creamed, FALSE);
+	    if (BlindedTimeout > creamed) make_blinded(creamed, FALSE);
 	    flags.botl = 1;
 	    break;
 	  }
@@ -10832,7 +10882,7 @@ arti_invoke(obj)
 	    extern int n_dgns; /* from dungeon.c */
 		
 		if(In_quest(&u.uz)){
-			pline("Nothing happens!");
+			pline("Nothing happens.");
 			break;
 		}
 	    if(u.uhave.amulet || In_endgame(&u.uz)){
@@ -10856,8 +10906,7 @@ arti_invoke(obj)
 		if(u.urider && mon_has_amulet(u.urider)){
 			rider_dismounts_you(DISMOUNT_VANISHED);
 		}
-		if(!Blind) You("are sucked into the scroll!");
-		else You_feel("weightless for a moment.");
+		You("are sucked into the scroll!");
 		
 		obj_extract_self(obj);
 		dropy(obj);
@@ -11089,7 +11138,7 @@ arti_invoke(obj)
 				obj->age = 0;
 				break;
 			} else if(u.dx || u.dy) {
-				if (isok(u.ux+u.dx, u.uy+u.dy) && (mtmp = m_at(u.ux+u.dx, u.uy+u.dy)) != 0 && mtmp->mcansee && mon_can_see_you(mtmp)) {
+				if (isok(u.ux+u.dx, u.uy+u.dy) && (mtmp = m_at(u.ux+u.dx, u.uy+u.dy)) != 0 && !is_blind(mtmp) && mon_can_see_you(mtmp)) {
 					boolean youattack = mtmp == &youmonst;
 					if(obj->otyp == ROUNDSHIELD) You("display the shield's device to %s.", mon_nam(mtmp));
 					else if(obj->otyp == CLOAK) You("display the cloak's clasp to %s.", mon_nam(mtmp));
@@ -11205,6 +11254,7 @@ arti_invoke(obj)
 						dmg = d(u.ulevel+obj->spe,12);
 						if(u.ukrau_duration) dmg *= 1.5;
 						dmg += spell_damage_bonus()*3;
+						if(youmonst.owrk) dmg = (dmg+1)/2;
 //						pline("mon found at %d, %d", bhitpos.x, bhitpos.y);
 					    if (cansee(bhitpos.x,bhitpos.y) && !canspotmon(mtmp)) {
 						    map_invisible(bhitpos.x, bhitpos.y);
@@ -11261,6 +11311,7 @@ arti_invoke(obj)
 					if(u.ukrau_duration) dmg *= 1.5;
 					dmg += spell_damage_bonus();
 					dmg *= 3;
+					if(youmonst.owrk) dmg = (dmg+1)/2;
 					pline("Some no mai, Tsukishiro!");
 					artinstance[obj->oartifact].SnSd1 = monstermoves + (long)(rnz(100)*(u.upriest||Role_if(PM_SAMURAI) ? .9 : 1));
 						explode(u.dx, u.dy,
@@ -11534,22 +11585,23 @@ arti_invoke(obj)
 			dmg = u.ulevel + 10;
 			if(u.ukrau_duration) dmg *= 1.5;
 			dmg += spell_damage_bonus();
-					exercise(A_WIS, TRUE);
-					cc.x=u.dx;cc.y=u.dy;
-					n=3;
-					while(n--) {
-						explode(u.dx, u.dy,
-							AD_FIRE, 0,
-							dmg,
-							EXPL_FIERY, 1);
-						u.dx = cc.x+rnd(3)-2; u.dy = cc.y+rnd(3)-2;
-						if (!isok(u.dx,u.dy) || !cansee(u.dx,u.dy) ||
-							IS_STWALL(levl[u.dx][u.dy].typ) || u.uswallow) {
-							/* Spell is reflected back to center */
-								u.dx = cc.x;
-								u.dy = cc.y;
-						}
-					}
+			if(youmonst.owrk) dmg = (dmg+1)/2;
+			exercise(A_WIS, TRUE);
+			cc.x=u.dx;cc.y=u.dy;
+			n=3;
+			while(n--) {
+				explode(u.dx, u.dy,
+					AD_FIRE, 0,
+					dmg,
+					EXPL_FIERY, 1);
+				u.dx = cc.x+rnd(3)-2; u.dy = cc.y+rnd(3)-2;
+				if (!isok(u.dx,u.dy) || !cansee(u.dx,u.dy) ||
+					IS_STWALL(levl[u.dx][u.dy].typ) || u.uswallow) {
+					/* Spell is reflected back to center */
+						u.dx = cc.x;
+						u.dy = cc.y;
+				}
+			}
 		} else obj->age = 0;
 	break;
 	case BLIZAGA:
@@ -11558,22 +11610,23 @@ arti_invoke(obj)
 			dmg = u.ulevel + 10;
 			if(u.ukrau_duration) dmg *= 1.5;
 			dmg += spell_damage_bonus();
-					exercise(A_WIS, TRUE);
-					cc.x=u.dx;cc.y=u.dy;
-					n=3;
-					while(n--) {
-						explode(u.dx, u.dy,
-							AD_COLD, 0,
-					dmg,
-							EXPL_FROSTY, 1);
-						u.dx = cc.x+rnd(3)-2; u.dy = cc.y+rnd(3)-2;
-						if (!isok(u.dx,u.dy) || !cansee(u.dx,u.dy) ||
-							IS_STWALL(levl[u.dx][u.dy].typ) || u.uswallow) {
-							/* Spell is reflected back to center */
-								u.dx = cc.x;
-								u.dy = cc.y;
-						}
-					}
+			if(youmonst.owrk) dmg = (dmg+1)/2;
+			exercise(A_WIS, TRUE);
+			cc.x=u.dx;cc.y=u.dy;
+			n=3;
+			while(n--) {
+				explode(u.dx, u.dy,
+					AD_COLD, 0,
+			dmg,
+					EXPL_FROSTY, 1);
+				u.dx = cc.x+rnd(3)-2; u.dy = cc.y+rnd(3)-2;
+				if (!isok(u.dx,u.dy) || !cansee(u.dx,u.dy) ||
+					IS_STWALL(levl[u.dx][u.dy].typ) || u.uswallow) {
+					/* Spell is reflected back to center */
+						u.dx = cc.x;
+						u.dy = cc.y;
+				}
+			}
 		} else obj->age = 0;
 	break;
 	case THUNDAGA:
@@ -11582,22 +11635,23 @@ arti_invoke(obj)
 			dmg = u.ulevel + 10;
 			if(u.ukrau_duration) dmg *= 1.5;
 			dmg += spell_damage_bonus();
-					exercise(A_WIS, TRUE);
-					cc.x=u.dx;cc.y=u.dy;
-					n=3;
-					while(n--) {
-						explode(u.dx, u.dy,
-							AD_ELEC, 0,
-					dmg,
-							EXPL_MAGICAL, 1);
-						u.dx = cc.x+rnd(3)-2; u.dy = cc.y+rnd(3)-2;
-						if (!isok(u.dx,u.dy) || !cansee(u.dx,u.dy) ||
-							IS_STWALL(levl[u.dx][u.dy].typ) || u.uswallow) {
-							/* Spell is reflected back to center */
-								u.dx = cc.x;
-								u.dy = cc.y;
-						}
-					}
+			if(youmonst.owrk) dmg = (dmg+1)/2;
+			exercise(A_WIS, TRUE);
+			cc.x=u.dx;cc.y=u.dy;
+			n=3;
+			while(n--) {
+				explode(u.dx, u.dy,
+					AD_ELEC, 0,
+			dmg,
+			EXPL_MAGICAL, 1);
+				u.dx = cc.x+rnd(3)-2; u.dy = cc.y+rnd(3)-2;
+				if (!isok(u.dx,u.dy) || !cansee(u.dx,u.dy) ||
+					IS_STWALL(levl[u.dx][u.dy].typ) || u.uswallow) {
+					/* Spell is reflected back to center */
+						u.dx = cc.x;
+						u.dy = cc.y;
+				}
+			}
 		} else obj->age = 0;
 	break;
 	case QUAKE:{
@@ -11676,6 +11730,7 @@ arti_invoke(obj)
 			dmg = u.ulevel + 10;
 			if(u.ukrau_duration) dmg *= 1.5;
 			dmg += spell_damage_bonus();
+			if(youmonst.owrk) dmg = (dmg+1)/2;
 			exercise(A_WIS, TRUE);
 			cc.x=u.dx;cc.y=u.dy;
 			n=3;
@@ -11926,6 +11981,7 @@ arti_invoke(obj)
 					dmg = u.ulevel/2 + 1;
 					if(u.ukrau_duration) dmg *= 1.5;
 					dmg += spell_damage_bonus();
+					if(youmonst.owrk) dmg = (dmg+1)/2;
 					exercise(A_WIS, TRUE);
 					cc.x=u.dx;cc.y=u.dy;
 					n=u.ulevel/5 + 1;
@@ -12015,6 +12071,12 @@ arti_invoke(obj)
 						pline_The("gray mold disappears!");
 						youmonst.mgmld_skin = 0;
 					}
+					youmonst.owrk = 0;
+					youmonst.ruh = 0;
+					youmonst.shey = 0;
+					youmonst.luahv = 0;
+					youmonst.nean = 0;
+					youmonst.nooh = 0;
 					healup(u.ulevel, 0, TRUE, TRUE);
 					obfree(pseudo, (struct obj *)0);	/* now, get rid of it */
 					obj->spe--; obj->spe--; obj->spe--; // lose three charge
@@ -12087,6 +12149,12 @@ arti_invoke(obj)
 						pline_The("gray mold disappears!");
 						youmonst.mgmld_skin = 0;
 					}
+					youmonst.owrk = 0;
+					youmonst.ruh = 0;
+					youmonst.shey = 0;
+					youmonst.luahv = 0;
+					youmonst.nean = 0;
+					youmonst.nooh = 0;
 					healup(maybe_polyd(u.mhmax - u.mh, u.uhpmax - u.uhp), 0, TRUE, TRUE); //heal spell
 					if(!DimensionalLock) while(n--) {
 						pm = &mons[summons[d(1,6)+3]];
@@ -13566,7 +13634,7 @@ arti_invoke(obj)
 						break;
 					case 3 : if (!resists_blnd(&youmonst)) {
 						pline("%s your vision!", Tobjnam(obj, "damage"));
-						make_blinded(Blinded + rnd(100),FALSE);
+						make_blinded(BlindedTimeout + rnd(100),FALSE);
 						if (!Blind) Your1(vision_clears);
 						} else {
 						pline("%s your vision.", Tobjnam(obj, "assault"));
@@ -13663,7 +13731,7 @@ arti_invoke(obj)
 			/* Clear blindness and hallucination, and provide temporary immunity.
 			* However, any new applications can still result in blindness/hallu the moment the protection wears off */
 			n = (Race_if(PM_ORC) && !Upolyd) ? 40 : 30;
-			Blinded = 0;
+			Blinded &= ~TIMEOUT;
 			HBlind_res += n;
 			HHalluc_resistance += n;
 			(void)make_hallucinated(FALSE, FALSE, W_ART);	/* silent */
@@ -13796,19 +13864,28 @@ arti_invoke(obj)
         case DETESTATION:
 			obj->age = 0L;
 			if(!Pantheon_if(PM_MADMAN) || u.uevent.uhand_of_elbereth){
-				pline("It's just a piece of blank paper!");
+				if(Blind)
+					pline("Actually, you know it's just a piece of blank paper!");
+				else
+					pline("It's just a piece of blank paper!");
 				obj->oartifact = 0;
 				/* remove old name */
 				rem_ox(obj, OX_ENAM);
 			}
 			else if(!u.uevent.qcompleted && Role_if(PM_MADMAN)){
-				pline("A throbbing yellow haze obscures your vision!");
+				if(Blind)
+					pline("A throbbing yellow haze fills your mind!");
+				else
+					pline("A throbbing yellow haze obscures your vision!");
 				You_cant("use this right now.");
 			}
 			else if(!IS_ALTAR(levl[u.ux][u.uy].typ)){
 				pline("This records the very secret and ancient rite once performed by the high-priests of Sarnath in detestation of Bokrug, the water-lizard, whose followers their ancestors had cruelly slain.");
 				if(!u.detestation_ritual){
-					pline("The rite is penned in your hand.");
+					if(Blind)
+						pline("You know the rite is penned in your hand.");
+					else
+						pline("The rite is penned in your hand.");
 					pline("What were you going to do with it?");
 				}
 				else {
@@ -14260,7 +14337,7 @@ nothing_special:
 		}
 		
 		if (!Punished) {
-			setworn(mkobj(CHAIN_CLASS, TRUE), W_CHAIN);
+			setworn(mkobj(CHAIN_CLASS, NO_MKOBJ_FLAGS), W_CHAIN);
 			setworn(obj, W_BALL);
 			uball->spe = 1;
 			if (!u.uswallow) {

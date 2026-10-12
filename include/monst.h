@@ -225,6 +225,9 @@ struct monst {
 	Bitfield(mnopickup,1); /* pet will leave items on the ground */
 	Bitfield(mcombat,1); /* pet is currently engaged in combat */
 	Bitfield(mgroup_summoned,1); /* monster has used its group summon ability */
+	Bitfield(mprone,1); /* monster is prone after being knocked down */
+	Bitfield(mrecruitable,1); /* monster can be recruited for quest reasons */
+	/*155*/
 
 	unsigned long long int 	seenmadnesses;	/* monster has seen these madnesses */
 	
@@ -246,6 +249,7 @@ struct monst {
 	int mbleed; /* bleed damage per round */
 	int mgmld_skin; /* mold spores in skin */
 	int mgmld_throat; /* mold spores in throat */
+	unsigned char owrk, ruh, shey, luahv, nean, nooh; /* active anti-syllable counters */
 	coord mprev_dir;		/* previous movement direction (stop thrust etc) */
 	coord mprev_attk;	/* previous attack direction (braced etc) */
 	long mlast_movement;/* turn on which it most recently moved (clear stop thrust) */
@@ -415,15 +419,18 @@ struct monst {
 #define	mvar1_afreet_lastsaw	mvar1
 #define mvar1_halo_sec_element	mvar1
 #define	mvar1_summon_ID			mvar1
-#define	mvar_mammon_dive_x	mvar1
+#define	mvar_mammon_dive_x		mvar1
+#define	mvar1_seaParity			mvar1
+#define mvar1_bereft_syllable	mvar1
 	long mvar2;
 #define	mvar_dracaePregTimer	mvar2
 #define	mvar_spList_2	mvar2
 #define	mvar_dreadPrayer_progress	mvar2
-#define	mvar_attack_pm	mvar2
+#define	mvar_attack_pm			mvar2
 #define	mvar_elfwraith_spell	mvar2
 #define	mvar_spellweaver_seed	mvar2
-#define	mvar_mammon_dive_y	mvar2
+#define	mvar_mammon_dive_y		mvar2
+#define	mvar2_bereft_target		mvar2
 	long mvar3;
 #define	mvar_conversationTracker	mvar3
 #define	mvar_lifesigns	mvar3
@@ -470,6 +477,10 @@ struct monst {
 #define MON_SWEP(mon)	((mon)->msw)
 #define MON_NOSWEP(mon)	((mon)->msw = (struct obj *)0)
 
-#define MIGRATINGMONSTER(mon)	((mon) != &youmonst && !(mon)->mx && !(mon)->my)
+/* a vault guard that has finished its job is parked at (0,0) until its
+ * fake corridor is removed; it is still on the level, not migrating */
+#define PARKEDGUARD(mon)	((mon)->isgd && get_mx(mon, MX_EVGD) && EVGD(mon)->gddone)
+#define MIGRATINGMONSTER(mon)	((mon) != &youmonst && !(mon)->mx && !(mon)->my \
+				 && !PARKEDGUARD(mon))
 
 #endif /* MONST_H */

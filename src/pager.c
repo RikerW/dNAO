@@ -614,6 +614,8 @@ lookat(x, y, buf, monbuf, shapebuff)
 			", being held" : ", holding you");
 	    if (mtmp->mleashed)
 		Strcat(buf, ", leashed to you");
+		if (mtmp->mprone)
+			Strcat(buf, ", prone");
 
 	    if (mtmp->mtrapped && cansee(mtmp->mx, mtmp->my)) {
 		struct trap *t = t_at(mtmp->mx, mtmp->my);
@@ -2475,6 +2477,7 @@ get_description_of_damage_type(uchar id)
 	case AD_SPOR: return "generate spore";
 	case AD_FNEX: return "fern spore explosion";
 	case AD_SSUN: return "reflected sunlight";
+	case AD_LGHT: return "light";
 	case AD_MAND: return "mandrake shriek";
 	case AD_BARB: return "retaliatory physical";
 	case AD_LUCK: return "drains luck";

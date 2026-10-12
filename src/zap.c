@@ -90,6 +90,7 @@ int adtyp, ztyp;
 		case AD_MAGM: return "magic missile";
 		case AD_PHYS: return "sothothic missile";
 		case AD_FIRE: return "fireball";
+		case AD_SFLM: return "spark of silver flame";
 		case AD_COLD: return "cone of cold";
 		case AD_UHCD: return "cone of ice";
 		case AD_GMLD: return "cone of gray spores";
@@ -216,6 +217,7 @@ int adtyp;
 	case AD_HOLY:
 	case AD_SMOK:
 	case AD_SLWC:
+	case AD_SFLM:
 		return CLR_WHITE;
 	case AD_DRLI:
 		return CLR_MAGENTA;
@@ -423,6 +425,7 @@ struct obj *otmp;
 			if (otyp == SPE_FORCE_BOLT){
 				if(u.ukrau_duration) dmg *= 1.5;
 			    dmg += spell_damage_bonus();
+				if(youmonst.owrk) dmg = (dmg+1)/2;
 			}
 			
 			hit(zap_type_text, mtmp, exclam(dmg));
@@ -466,6 +469,7 @@ struct obj *otmp;
 			if (otyp == SPE_TURN_UNDEAD){
 				if(u.ukrau_duration) dmg *= 1.5;
 				dmg += spell_damage_bonus();
+				if(youmonst.owrk) dmg = (dmg+1)/2;
 			}
 			flags.bypasses = TRUE;	/* for make_corpse() */
 			if (!resist(mtmp, otmp->oclass, dmg, TELL)) {
@@ -623,6 +627,7 @@ struct obj *otmp;
 				levlost *= 1.5;
 			}
 			dmg += spell_damage_bonus();
+			if(youmonst.owrk) dmg = (dmg+1)/2;
 		}
 		if (resists_drli(mtmp)){
 		    shieldeff(mtmp->mx, mtmp->my);
@@ -3632,6 +3637,11 @@ register struct	obj	*obj;
 				zapdat.no_hit_wall = TRUE;
 				zapdat.damn *= 1.5;
 				zapdat.damn = max(zapdat.damn, 6);
+				if(SilverInvoke && !FLAME_BAD){
+					zapdat.adtyp = AD_SFLM;
+					if(SilverInvokeWrath)
+						zapdat.damn *= 2;
+				}
 				break;
 			case SPE_ACID_SPLASH:
 				range = 1;
@@ -4077,6 +4087,7 @@ struct zapdata * zapdata;
 		if (youagr ? Spellboost : mon_resistance(magr, SPELLBOOST)) {
 			dmg *= 2;
 		}
+		if(magr->owrk) dmg = (dmg+1)/2;
 	}
 	/* general resistance */
 	if (mdef && Half_spel(mdef))
@@ -5611,7 +5622,7 @@ boolean *shopdamage;
 	struct rm *lev = &levl[x][y];
 	int rangemod = 0;
 
-	if(adtyp == AD_FIRE || adtyp == AD_MADF) {
+	if(adtyp == AD_FIRE || adtyp == AD_MADF || adtyp == AD_SFLM) {
 	    struct trap *t = t_at(x, y);
 
 	    if (t && t->ttyp == WEB && !Is_lolth_level(&u.uz) && !(u.specialSealsActive&SEAL_BLACK_WEB)) {
@@ -5624,6 +5635,13 @@ boolean *shopdamage;
 		lev->typ = SOIL;
 		if(cansee(x,y)) {
 			pline("The grass burns away!");
+			newsym(x,y);
+		}
+	    }
+	    if(adtyp == AD_SFLM && SilverInvokeMortal && lev->typ == TREE) {
+		lev->typ = DEADTREE;
+		if(cansee(x,y)) {
+			pline("The tree burns and dies!");
 			newsym(x,y);
 		}
 	    }
@@ -5759,6 +5777,7 @@ boolean *shopdamage;
 		case AD_FIRE:
 		case AD_EFIR:
 		case AD_MADF:
+		case AD_SFLM:
 		    new_doormask = D_NODOOR;
 		    see_txt = "The door is consumed in flames!";
 		    sense_txt = "smell smoke.";
@@ -6359,6 +6378,11 @@ retry:
 	u.uconduct.wishes++;
 
 	if (otmp != &zeroobj) {
+
+	    if (otmp->oclass == SPBOOK_CLASS && otmp->otyp != SPE_BLANK_PAPER
+			&& LongtermBlind
+		)
+			add_oprop(otmp, OPROP_TACTB);
 
 	    if (!flags.debug) {
 			char llog[BUFSZ+20];

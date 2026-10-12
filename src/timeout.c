@@ -531,6 +531,12 @@ nh_timeout()
 	if(u.unaen_duration) u.unaen_duration--;
 	if(u.uuur_duration) u.uuur_duration--;
 	if(u.uvaul_duration) u.uvaul_duration--;
+	if(youmonst.owrk) youmonst.owrk--;
+	if(youmonst.ruh) youmonst.ruh--;
+	if(youmonst.shey) youmonst.shey--;
+	if(youmonst.luahv) youmonst.luahv--;
+	if(youmonst.nean) youmonst.nean--;
+	if(youmonst.nooh) youmonst.nooh--;
 	
 	if (u.uluck != baseluck) {
 	    int timeout = 600;
@@ -943,7 +949,7 @@ nh_timeout()
 			stop_occupation();
 			break;
 		case BLINDED:
-			Blinded = 1;
+			set_itimeout(&Blinded, 1L);
 			make_blinded(0L, TRUE);
 			stop_occupation();
 			break;
@@ -2775,6 +2781,19 @@ struct obj *obj;
 	return obj;
 }
 
+/* callback proc for a monster whose exhausted light-emitting cells have recovered */
+void
+relight_mon(genericptr_t arg, long timeout)
+{
+	struct monst *mon = (struct monst *)arg;
+
+	if (DEADMONSTER(mon) || mon->light)
+		return;
+	/* this timer is already off mon->timed, so emits_light_mon() gives the full radius again */
+	if (emits_light_mon(mon))
+		new_light_source(LS_MONSTER, (genericptr_t)mon, emits_light_mon(mon));
+}
+
 /* callback procs to desummon monsters/objects */
 void
 desummon_mon(arg, timeout)
@@ -3177,6 +3196,8 @@ static const ttable timeout_funcs[NUM_TIME_FUNCS] = {
 	TTAB(slow_wheel,		(timeout_proc)0,	"slow_wheel"),
 	TTAB(cloud_drift,		(timeout_proc)0,	"cloud_drift"),
 	TTAB(unsuppress_object,	(timeout_proc)0,	"unsuppress_object"),
+	TTAB(relight_mon,		(timeout_proc)0,	"relight_mon"),
+	TTAB(crumble_if_improved,	(timeout_proc)0,	"crumble_if_improved"),
 };
 #undef TTAB
 

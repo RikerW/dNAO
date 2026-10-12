@@ -281,12 +281,17 @@ target_on(mask, mtmp)
 
 	otyp = which_arti(mask);
 	if(!mon_has_arti(mtmp, otyp)) {
-	    if(you_have(mask))
-		return(STRAT(STRAT_PLAYER, u.ux, u.uy, mask));
-	    else if((otmp = on_ground(otyp))){
-			return(STRAT(STRAT_GROUND, otmp->ox, otmp->oy, mask));
-	    } else if((mtmp2 = other_mon_has_arti(mtmp, otyp)) && !rightful_owner(mtmp2, otyp, mtmp))
-		return(STRAT(STRAT_MONSTR, mtmp2->mx, mtmp2->my, mask));
+	    /* a diagonal_mover can't covet a target it can never reach */
+	    if(you_have(mask)){
+		if(shared_world(mtmp, u.ux, u.uy))
+		    return(STRAT(STRAT_PLAYER, u.ux, u.uy, mask));
+	    } else if((otmp = on_ground(otyp))){
+			if(shared_world(mtmp, otmp->ox, otmp->oy))
+				return(STRAT(STRAT_GROUND, otmp->ox, otmp->oy, mask));
+	    } else if((mtmp2 = other_mon_has_arti(mtmp, otyp)) && !rightful_owner(mtmp2, otyp, mtmp)){
+		if(shared_world(mtmp, mtmp2->mx, mtmp2->my))
+		    return(STRAT(STRAT_MONSTR, mtmp2->mx, mtmp2->my, mask));
+	    }
 	}
 	return(STRAT_NONE);
 }
@@ -1008,8 +1013,9 @@ yellow_smite()
 				punish((struct obj *)0);
 			}
 			else {
-				Your("iron ball gets heavier!");
-				uball->owt += 160;
+				Your("%s ball gets heavier!", material_name(uball, TRUE));
+				uball->ovar1_heavy_ball += 160;
+				uball->owt = weight(uball);
 			}
 		break;
 		case 2:

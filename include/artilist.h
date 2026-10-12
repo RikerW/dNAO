@@ -1643,6 +1643,17 @@ A("Masamune",						NAGAMAKI,				(const char *)0,
 	NOINVOKE, NOFLAG
 	),
 
+/*Needs encyc entry*/
+A("Floating Stone",						LOADSTONE,				(const char *)0,
+	7500L, MT_DEFAULT, MZ_DEFAULT, WT_DEFAULT,
+	A_NONE, NON_PM, NON_PM, TIER_S, (ARTG_NOGEN|ARTG_NOWISH),
+	NO_MONS(),
+	ATTK(AD_PHYS, 1, 1), NOFLAG,
+	PROPS(), NOFLAG,
+	PROPS(), NOFLAG,
+	LEVITATION, NOFLAG
+	),
+
 /*from Final Fantasy*/
 /*The crystals are generated together.  The Black Crystal "counts", and the others don't.*/
 A("The Black Crystal",				CRYSTAL_BALL,			(const char *)0,
@@ -3148,7 +3159,7 @@ A("The Platinum Dragon Plate",		SILVER_DRAGON_SCALE_MAIL,			(const char *)0,
 	A_NONE, NON_PM, NON_PM, TIER_S, (ARTG_NOGEN|ARTG_NOWISH),
 	NO_MONS(),
 	NO_ATTK(), NOFLAG,
-	PROPS(ANTIMAGIC, HOLY_FIRE_RES, HOLY_COLD_RES, DISINT_RES, HOLY_SHOCK_RES, SLEEP_RES, FREE_ACTION), NOFLAG,
+	PROPS(ANTIMAGIC, HOLY_FIRE_RES, COLD_RES, DISINT_RES, SHOCK_RES, SLEEP_RES, FREE_ACTION), NOFLAG,
 	PROPS(), NOFLAG,
 	NOINVOKE, NOFLAG
 	),

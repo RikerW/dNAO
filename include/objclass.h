@@ -239,11 +239,16 @@ struct objclass {
 #define ETRAIT_BLADEDANCE		0x00040000L
 #define ETRAIT_PUNCTURE			0x00080000L //Escalating chance for a double-damage hit
 #define ETRAIT_STRIKING			0x00100000L
-#define MAX_ETRAIT				ETRAIT_STRIKING
+#define ETRAIT_WHIP_TRICKS		0x00200000L
+#define ETRAIT_ANTI_UNDEAD		0x00400000L
+#define MAX_ETRAIT				ETRAIT_ANTI_UNDEAD
 //
 
 #define wielder_size(mon) ((mon) == &youmonst ? youracedata->msize : (mon)->data->msize)
-#define CHECK_ETRAIT(obj, mon, trait) (check_etrait((obj), (mon), (trait)))
+#define CHECK_ETRAIT(obj, mon, trait) (check_etrait((obj), (mon), (trait), TRUE))
+/* like CHECK_ETRAIT, but ignores the wielder's weapon skill: reports whether the
+   item bears the trait at all, even if the wielder isn't skilled enough to use it */
+#define HAS_ETRAIT(obj, mon, trait) (check_etrait((obj), (mon), (trait), FALSE))
 #define ROLL_ETRAIT(obj, mon, echance, schance) (((mon) == &youmonst ? (P_SKILL(weapon_type(obj)) > P_SKILLED) : ((mon)->data->mflagsf&MF_MARTIAL_E)) ? echance : schance)
 #define FFORM_ETRAIT(obj, mon) (obj->expert_traits&FFORM_ETRAITS && ((mon) == &youmonst ? (P_SKILL(weapon_type(obj)) > P_BASIC ) : (((mon)->data->mflagsf&MF_MARTIAL_E) || ((mon)->data->mflagsf&MF_MARTIAL_S))))
 

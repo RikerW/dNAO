@@ -112,7 +112,7 @@ const char *fmt, *arg;
 	    }
 	}
 	if (was_blind && !Blind) {	/* reverting from eyeless */
-	    Blinded = 1L;
+	    set_itimeout(&Blinded, 1L);
 	    make_blinded(0L, TRUE);	/* remove blindness */
 	}
 
@@ -587,7 +587,7 @@ int	mntmp;
 	    }
 	}
 	if (was_blind && !Blind) {	/* previous form was eyeless */
-	    Blinded = 1L;
+	    set_itimeout(&Blinded, 1L);
 	    make_blinded(0L, TRUE);	/* remove blindness */
 	}
 	newsym(u.ux,u.uy);		/* Change symbol */
@@ -1681,6 +1681,12 @@ dogaze(struct monst *mtmp)
 		   	         dmg *= 2;
 				 }
 		   	 break;
+		   	 case AD_LGHT:
+		   	     dmg = d(damn,damd);
+		   	     You("attack %s with a searing stare!", mon_nam(mtmp));
+		   	     if (mon_reflects(mtmp, "The searing light is reflected by %s %s!"))
+		   	         dmg = 0;
+		   	 break;
 			 case AD_STDY:
 				You("study %s carefully.",mon_nam(mtmp));
 				mtmp->mstdy = max(d(damn,damd),mtmp->mstdy);
@@ -2760,6 +2766,9 @@ atkbp_bodypart_name(struct atkbp_set bp, struct permonst *ptr)
 	    ATKBP(TENTACLE_ARM_6TH), ATKBP(NONE) });
 	struct atkbp_set alien_limb_words = atkbp_or((struct atkbp_set[]){
 	    ATKBP(ALIEN_LIMB_1ST), ATKBP(ALIEN_LIMB_2ND), ATKBP(NONE) });
+	struct atkbp_set secondary_arm_words = atkbp_or((struct atkbp_set[]){
+	    ATKBP(SECONDARY_ARM), ATKBP(1ST_SECONDARY_ARM), ATKBP(2ND_SECONDARY_ARM),
+	    ATKBP(3RD_SECONDARY_ARM), ATKBP(4TH_SECONDARY_ARM), ATKBP(5TH_SECONDARY_ARM), ATKBP(NONE) });
 	struct atkbp_set no_noun = atkbp_or((struct atkbp_set[]){
 	    ATKBP(NONE), ATKBP(INNUMERABLE), ATKBP(MIND_NOLIMB), ATKBP(NONE) });
 
@@ -2774,6 +2783,8 @@ atkbp_bodypart_name(struct atkbp_set bp, struct permonst *ptr)
 	    return ptrbodypart(ptr, HEAD, (struct monst *) 0);
 	if (atkbp_intersects(bp, ATKBP(EYES)))
 	    return ptrbodypart(ptr, EYE_BP, (struct monst *) 0);
+	if (atkbp_intersects(bp, ATKBP(LENS_ARRAY)))
+	    return "lens array";
 	if (atkbp_intersects(bp, ATKBP(TONGUE)))
 	    return ptrbodypart(ptr, TONGUE, (struct monst *) 0);
 	if (atkbp_intersects(bp, ATKBP(WING)))
@@ -2785,6 +2796,12 @@ atkbp_bodypart_name(struct atkbp_set bp, struct permonst *ptr)
 	    return "pincer";
 	if (atkbp_intersects(bp, arm_lower_words))
 	    return "lower arm";
+	if (atkbp_intersects(bp, secondary_arm_words)) {
+	    static char secondary_arm_buf[BUFSZ];
+
+	    Sprintf(secondary_arm_buf, "secondary %s", ptrbodypart(ptr, ARM, (struct monst *) 0));
+	    return secondary_arm_buf;
+	}
 
 	if (atkbp_intersects(bp, ATKBP(LIMB_GENERIC))) return "limb";
 	if (atkbp_intersects(bp, ATKBP(LAUNCHER_GENERIC))) return "launcher";
@@ -2871,7 +2888,8 @@ int damtype, dam;
 				heal = dam / 6; /* Approx 1 per die */
 			break;
 		case AD_EFIR:
-		case AD_FIRE: if (u.umonnum == PM_IRON_GOLEM || u.umonnum == PM_GREEN_STEEL_GOLEM || u.umonnum == PM_CHAIN_GOLEM || u.umonnum == PM_ARGENTUM_GOLEM)
+		case AD_FIRE:
+		case AD_SFLM: if (u.umonnum == PM_IRON_GOLEM || u.umonnum == PM_GREEN_STEEL_GOLEM || u.umonnum == PM_CHAIN_GOLEM || u.umonnum == PM_ARGENTUM_GOLEM)
 				heal = dam;
 			break;
 	}

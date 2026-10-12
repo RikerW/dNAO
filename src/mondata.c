@@ -197,6 +197,33 @@ mon_injured_leg_count(struct monst *mon)
 	return atkbp_leg_count(atkbp_union(mon->minjuries, missing));
 }
 
+boolean
+mon_enough_legs_to_stand(struct monst *mon)
+{
+	int full = mon_body_leg_count(mon);
+
+	return full > 0 && 2 * (full - mon_injured_leg_count(mon)) > full;
+}
+
+/* True if magr could theoretically trip mdef with a tripping attack. */
+boolean
+could_trip(struct monst *magr, struct monst *mdef)
+{
+	// mdef must be trippable at all
+	if (mdef->mprone || !is_trippable(mdef) || !could_stand_in_square(mdef))
+		return FALSE;
+	// mdef must not have a stance too stable to upset 
+	//  (many-legged arachnids/insects/lizards: splayed-out legs and low center of gravity)
+	if (mon_body_leg_count(mdef) > 2
+			&& (is_arachnid(mdef->data) || is_insectoid(mdef->data)
+			    || mdef->data->mlet == S_LIZARD))
+		return FALSE;
+	// mdef must not tower too far above magr in size
+	if (wielder_size(mdef) - wielder_size(magr) > 2)
+		return FALSE;
+	return TRUE;
+}
+
 /* Injuries are dealt against this set, not mbodyparts_full: hurting a limb
  * must never be what reveals it. */
 int
@@ -279,6 +306,12 @@ injure_random_parts(struct monst *mon, struct atkbp_set family, int count,
 		mon_drop_wielded(mon, MON_WEP(mon));
 	if (atkbp_intersects(hurt, ATKBP(ARM_OFFHAND)))
 		mon_drop_wielded(mon, MON_SWEP(mon));
+	if (!mon_enough_legs_to_stand(mon)) {
+		if (mon == &youmonst)
+			make_prone(TRUE);
+		else
+			make_mon_prone(mon, TRUE);
+	}
 	return n;
 }
 
@@ -528,6 +561,13 @@ int newpm;
 			mon->mvar_flask_charges = MAX_FLASK_CHARGES(mon);
 		}
 	}
+	else if(diagonal_mover(&mons[newpm])){
+		/* a diagonal_mover is permanently confined to the parity it's on
+		 * when it becomes one; see shared_world() and goodpos(). Stored as
+		 * 1+parity so that 0 unambiguously means "never established". */
+		mon->mvar1_seaParity = 1 + ((mon == &youmonst) ? ((u.ux + u.uy) % 2)
+						: ((mon->mx + mon->my) % 2));
+	}
 	else switch(newpm){
 		case PM_PALE_NIGHT:
 			mon->mvar_paleWarning = 0;
@@ -545,7 +585,8 @@ int newpm;
 				mon->mvar_huskID = 0;
 		break;
 		case PM_ALABASTER_MUMMY:
-			if(oldpm != PM_ALABASTER_MUMMY){
+		case PM_SHRIEKING_SHADOW:
+			if(!has_syllable(&mons[oldpm])){
 				switch(rnd(6)){
 					case 1:
 						mon->mvar_syllable = SYLLABLE_OF_STRENGTH__AESH;

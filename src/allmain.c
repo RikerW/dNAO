@@ -13,6 +13,7 @@
 #include "xhity.h"
 #include "hashmap.h"
 #include "hashutil.h"
+#include "qtext.h"
 
 #ifndef NO_SIGNAL
 #include <signal.h>
@@ -1012,6 +1013,7 @@ you_regen_hp()
 	boolean bleeding = FALSE;
 	boolean air_drowning = FALSE;
 	boolean disintegrating = FALSE;
+	boolean unmaking = FALSE;
 
 	// set hp, maxhp pointers
 	hp    = (Upolyd) ? (&u.mh)    : (&u.uhp);
@@ -1129,6 +1131,13 @@ you_regen_hp()
 		bleeding = TRUE;
 		perX -= youmonst.mbleed*HEALCYCLE;
 		blockRegen = TRUE;
+	}
+
+	/*Anti-syllable degeneration*/
+	if(youmonst.nooh){
+		blockRegen = TRUE;
+		unmaking = TRUE;
+		perX -= 10*HEALCYCLE;
 	}
 
 	if (check_mutation(TT_LIZARD_TAIL) && !blockRegen){
@@ -1346,6 +1355,8 @@ you_regen_hp()
 					killer="air-drowning";
 				else if(disintegrating)
 					killer="disintegrating in bright light";
+				else if(unmaking)
+					killer="unmaking";
 				else
 					killer="poor health, apparently";
 				done(DIED);
@@ -1458,6 +1469,10 @@ you_regen_pw()
 	if(check_mutation(SHUB_RADIANCE)){
 		perX += Insight/3;
 		perX += max(2*Insight/3, Insanity);
+	}
+	/*Anti-syllable degeneration*/
+	if(youmonst.nean){
+		perX -= 10*HEALCYCLE;
 	}
 	// power drain from maintained spells
 	if (u.maintained_en_debt > 0)
@@ -1871,26 +1886,8 @@ moveloop()
 			nxtmon = mtmp->nmon;
 			if(DEADMONSTER(mtmp))
 				continue;
-			if(mtmp->m_insight_level > Insight && !mtmp->mcan && mtmp->mtyp == PM_TRANSCENDENT_TETTIGON){
-				set_mon_data(mtmp, PM_UNMASKED_TETTIGON);
-				mtmp->m_insight_level -= 35;
-				newsym(x(mtmp), y(mtmp));
-			}
-			if(mtmp->m_insight_level > Insight
-			  || (mtmp->mtyp == PM_WALKING_DELIRIUM && BlockableClearThoughts)
-			  || (mtmp->mtyp == PM_STRANGER && !quest_status.touched_artifact)
-			  || ((mtmp->mtyp == PM_PUPPET_EMPEROR_XELETH || mtmp->mtyp == PM_PUPPET_EMPRESS_XEDALLI) && mtmp->mvar_yellow_lifesaved)
-			  || (mtmp->mtyp == PM_TWIN_SIBLING && (mtmp->mvar_twin_lifesaved || !(u.specialSealsActive&SEAL_YOG_SOTHOTH)))
-			){
-				if(!(mtmp->mtrapped && t_at(mtmp->mx, mtmp->my) && t_at(mtmp->mx, mtmp->my)->ttyp == VIVI_TRAP)){
-					if(mtmp->mtyp == PM_TRANSCENDENT_TETTIGON && mtmp->mvar1_tettigon_uncancel){
-						mtmp->mvar1_tettigon_uncancel = FALSE;
-						set_mcan(mtmp, FALSE);
-					}
-					insight_vanish(mtmp);
-					continue;
-				}
-			}
+			if(maybe_vanish(mtmp))
+				continue;
 			if(has_template(mtmp, DELOUSED)){
 				delouse_tame(mtmp);
 				continue;
@@ -1987,22 +1984,8 @@ moveloop()
 						newsym(mtmp->mx,mtmp->my);
 					}
 				}
-				if(mtmp->m_insight_level > Insight && !mtmp->mcan && mtmp->mtyp == PM_TRANSCENDENT_TETTIGON){
-					set_mon_data(mtmp, PM_UNMASKED_TETTIGON);
-					mtmp->m_insight_level -= 35;
-					newsym(x(mtmp), y(mtmp));
-				}
-				if(mtmp->m_insight_level > Insight
-				  || (mtmp->mtyp == PM_WALKING_DELIRIUM && BlockableClearThoughts)
-				  || (mtmp->mtyp == PM_STRANGER && !quest_status.touched_artifact)
-				  || ((mtmp->mtyp == PM_PUPPET_EMPEROR_XELETH || mtmp->mtyp == PM_PUPPET_EMPRESS_XEDALLI) && mtmp->mvar_yellow_lifesaved)
-				  || (mtmp->mtyp == PM_TWIN_SIBLING && (mtmp->mvar_twin_lifesaved || !(u.specialSealsActive&SEAL_YOG_SOTHOTH)))
-				){
-					if(!(mtmp->mtrapped && t_at(mtmp->mx, mtmp->my) && t_at(mtmp->mx, mtmp->my)->ttyp == VIVI_TRAP)){
-						insight_vanish(mtmp);
-						continue;
-					}
-				}
+				if(maybe_vanish(mtmp))
+					continue;
 				if(has_template(mtmp, DELOUSED)){
 					delouse_tame(mtmp);
 					continue;
@@ -2570,7 +2553,7 @@ karemade:
 					}
 				}
 
-				if(BlowingWinds && !mtmp->mtame){
+				if(BlowingWinds && !mtmp->mtame && isok(mtmp->mx, mtmp->my)){
 					static long lastbwmessage = 0L;
 					if(lastbwmessage != monstermoves && canspotmon(mtmp)){
 						lastbwmessage = monstermoves;
@@ -3886,22 +3869,8 @@ karemade:
 			mtmp->mappearance = 0;
 			newsym(mtmp->mx, mtmp->my);
 		}
-		if(mtmp->m_insight_level > Insight && !mtmp->mcan && mtmp->mtyp == PM_TRANSCENDENT_TETTIGON){
-			set_mon_data(mtmp, PM_UNMASKED_TETTIGON);
-			mtmp->m_insight_level -= 35;
-			newsym(x(mtmp), y(mtmp));
-		}
-		if(mtmp->m_insight_level > Insight
-		  || (mtmp->mtyp == PM_WALKING_DELIRIUM && BlockableClearThoughts)
-		  || (mtmp->mtyp == PM_STRANGER && !quest_status.touched_artifact)
-		  || ((mtmp->mtyp == PM_PUPPET_EMPEROR_XELETH || mtmp->mtyp == PM_PUPPET_EMPRESS_XEDALLI) && mtmp->mvar_yellow_lifesaved)
-		  || (mtmp->mtyp == PM_TWIN_SIBLING && (mtmp->mvar_twin_lifesaved || !(u.specialSealsActive&SEAL_YOG_SOTHOTH)))
-		){
-			if(!(mtmp->mtrapped && t_at(mtmp->mx, mtmp->my) && t_at(mtmp->mx, mtmp->my)->ttyp == VIVI_TRAP)){
-				insight_vanish(mtmp);
-				continue;
-			}
-		}
+		if(maybe_vanish(mtmp))
+			continue;
 		if(has_template(mtmp, DELOUSED)){
 			delouse_tame(mtmp);
 			continue;
@@ -4030,6 +3999,10 @@ karemade:
 	    if (vision_full_recalc) vision_recalc(0);	/* vision! */
 	}
 	oldBlind = !!Blind;
+	if (u.uroleplay.blind && !Blind) {
+		pline("For the first time in your life, you can see!");
+		u.uroleplay.blind = FALSE;
+	}
 ////////////////////////////////////////////////////////////////////////////////////////////////
 	if(!flags.mv || LightBlind || oldLightBlind != (!!LightBlind)) {
 	    /* redo monsters if hallu or wearing a helm of telepathy */
@@ -4317,16 +4290,21 @@ newgame()
 	 */
 	if(MON_AT(u.ux, u.uy)) mnexto(m_at(u.ux, u.uy));
 	(void) makedog();
-	if(Race_if(PM_ANDROID))
+	if(Race_if(PM_ANDROID) && Role_if(PM_ANACHRONONAUT) && !u.uroleplay.pauper)
 		scatter_weapons();
 	if(flags.aasimar_type == AASIMAR_TYPE_SERAPH)
 		scatter_eyes();
 	docrt();
-	if (Role_if(PM_CONVICT) || (Role_if(PM_MADMAN) && Race_if(PM_VAMPIRE))) {
-		setworn(mkobj(CHAIN_CLASS, TRUE), W_CHAIN);
-		setworn(mkobj(BALL_CLASS, TRUE), W_BALL);
+	if ((Role_if(PM_CONVICT) && !(u.uroleplay.pauper && Race_if(PM_YUKI_ONNA)))
+		|| (Role_if(PM_MADMAN) && Race_if(PM_VAMPIRE))
+	) {
+		setworn(mkobj(CHAIN_CLASS, NO_MKOBJ_FLAGS), W_CHAIN);
+		setworn(mkobj(BALL_CLASS, MKOBJ_ARTIF), W_BALL);
 		uball->spe = 1;
-		if (Race_if(PM_CHIROPTERAN)) uball->owt = 1600;
+		if (Race_if(PM_CHIROPTERAN)) {
+			uball->ovar1_heavy_ball = 1600 - objects[uball->otyp].oc_weight;
+			uball->owt = weight(uball);
+		}
 		placebc();
 		newsym(u.ux,u.uy);
 	}
@@ -4334,41 +4312,41 @@ newgame()
 	if (flags.legacy) {
 		flush_screen(1);
         if(Role_if(PM_EXILE)){
-			com_pager(217);
+			com_pager(QT_COMMON_LEGACY_BINDER);
 #ifdef CONVICT
 		} else if (Role_if(PM_CONVICT)) {
-		    com_pager(199);
+		    com_pager(QT_COMMON_LEGACY_CONVICT);
 #endif /* CONVICT */
         // } else if(Race_if(PM_ELF)){
-			// com_pager(211);
+			// com_pager(QT_COMMON_LEGACY_ELF);
 		} else if(Race_if(PM_ELF) && (Role_if(PM_PRIEST) || Role_if(PM_RANGER) || Role_if(PM_NOBLEMAN) || Role_if(PM_WIZARD))){
-			com_pager(211);
+			com_pager(QT_COMMON_LEGACY_ELF);
 		} else if(Role_if(PM_ANACHRONONAUT)){
-			com_pager(218);
+			com_pager(QT_COMMON_LEGACY_ANA);
 			if(Race_if(PM_ANDROID)){
-				com_pager(222);
-				com_pager(223);
-				com_pager(224);
-				com_pager(225);
+				com_pager(QT_COMMON_LEGACY_ANDROID);
+				com_pager(u.uroleplay.pauper ? QT_COMMON_LEGACY_ANDROID2_PAUPER : QT_COMMON_LEGACY_ANDROID2);
+				com_pager(QT_COMMON_LEGACY_ANDROID3);
+				com_pager(u.uroleplay.pauper ? QT_COMMON_LEGACY_ANDROID4_PAUPER : QT_COMMON_LEGACY_ANDROID4);
 			} else {
-				com_pager(219);
-				com_pager(220);
-				com_pager(221);
+				com_pager(QT_COMMON_LEGACY_ANA2);
+				com_pager(QT_COMMON_LEGACY_ANA3);
+				com_pager(QT_COMMON_LEGACY_ANA4);
 			}
 		} else if(Role_if(PM_UNDEAD_HUNTER)){
-			com_pager(227);
+			com_pager(QT_COMMON_LEGACY_UH);
 		} else if(Race_if(PM_WORM_THAT_WALKS)){
 			if(Role_if(PM_CONVICT)){
-				com_pager(214);
+				com_pager(QT_COMMON_LEGACY_WORM_CONVICT);
 			} else if(Race_if(PM_ELF) && (Role_if(PM_PRIEST) || Role_if(PM_RANGER) || Role_if(PM_NOBLEMAN) || Role_if(PM_WIZARD))){
-				com_pager(213);
+				com_pager(QT_COMMON_LEGACY_WORM_ELF);
 			} else {
-				com_pager(212);
+				com_pager(QT_COMMON_LEGACY_WORM);
 			}
-			com_pager(215);
-			com_pager(216);
+			com_pager(QT_COMMON_LEGACY_WORM2);
+			com_pager(QT_COMMON_LEGACY_WORM3);
 		} else {
-			com_pager(1);
+			com_pager(QT_COMMON_LEGACY);
 		}
 	}
 	if(Darksight) litroom(FALSE,NULL);
@@ -4453,7 +4431,7 @@ newgame()
 			}
 		}
 	}
-	if(Race_if(PM_SILVERKNIGHT)){
+	if(Race_if(PM_SILVERKNIGHT) && !u.uroleplay.pauper){
 		struct obj *otmp;
 #define MKSNSTITEM(otyp) otmp = mksobj_at(otyp, u.ux, u.uy, MKOBJ_NOINIT); otmp->mired = 1; otmp->blessed = 1; otmp->spe = 1; fully_identify_obj(otmp);
 		MKSNSTITEM(SILVERKNIGHT_ARMOR);
@@ -4846,6 +4824,8 @@ printEtraits()
 			{ETRAIT_BLADEDANCE, "Bladedance"},
 			{ETRAIT_PUNCTURE, "Puncture"},
 			{ETRAIT_STRIKING, "Striking"},
+			{ETRAIT_WHIP_TRICKS, "Whip Tricks"},
+			{ETRAIT_ANTI_UNDEAD, "Anti-Undead"},
 			{0,0}
 		};
 		for(i=0;i<NUM_OBJECTS;i++){
@@ -5814,7 +5794,7 @@ alkilith_spawn(struct monst *mon)
 				}
 			}
 		}
-		if(!mon->mpeaceful && !rn2(66)){
+		if(!mon->mpeaceful && !rn2(66) && !DimensionalLock){
 			struct permonst *ptr = mkclass(rn2(2) ? S_DEMON : S_IMP, G_HELL);
 			if(ptr){
 				mtmp = makemon(ptr, xlocale, ylocale, MM_ADJACENTOK|MM_NOCOUNTBIRTH);
@@ -5999,6 +5979,8 @@ struct monst *mon;
 				mtmp->mtrapped = 0;
 				mtmp->entangled_otyp = 0;
 				mtmp->entangled_oid = 0;
+				mtmp->owrk = 0; mtmp->ruh = 0; mtmp->shey = 0;
+				mtmp->luahv = 0; mtmp->nean = 0; mtmp->nooh = 0;
 			}
 		}
 		xlocale += rn2(3) - 1;
@@ -6076,7 +6058,9 @@ struct monst *mon;
 			mtmp->mtrapped = 0;
 			mtmp->entangled_otyp = 0;
 			mtmp->entangled_oid = 0;
-			
+			mtmp->owrk = 0; mtmp->ruh = 0; mtmp->shey = 0;
+			mtmp->luahv = 0; mtmp->nean = 0; mtmp->nooh = 0;
+
 			break; //ends the loop
 		}
 	}
@@ -6149,6 +6133,8 @@ struct monst *mon;
 					mtmp->mtrapped = 0;
 					mtmp->entangled_otyp = 0;
 					mtmp->entangled_oid = 0;
+					mtmp->owrk = 0; mtmp->ruh = 0; mtmp->shey = 0;
+					mtmp->luahv = 0; mtmp->nean = 0; mtmp->nooh = 0;
 				}
 			}
 		}
@@ -6281,6 +6267,8 @@ struct monst *mon;
 				mtmp->mtrapped = 0;
 				mtmp->entangled_otyp = 0;
 				mtmp->entangled_oid = 0;
+				mtmp->owrk = 0; mtmp->ruh = 0; mtmp->shey = 0;
+				mtmp->luahv = 0; mtmp->nean = 0; mtmp->nooh = 0;
 			}
 		}
 	}
