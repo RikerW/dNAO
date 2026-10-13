@@ -220,6 +220,8 @@
 				 (ptr)->mtyp == PM_ARA_KAMEREL || \
 				 (ptr)->mtyp == PM_ACERERAK || \
 				 (ptr)->mtyp == PM_RADIANT_PYRAMID)
+#define is_gold_mon(mon)	(is_gold((mon)->data) || \
+							(mon == &youmonst && uclockwork && (u.clk_material == GOLD)))
 #define is_iron(ptr)	((ptr)->mtyp == PM_IRON_PIERCER || \
 				 (ptr)->mtyp == PM_IRON_GOLEM || \
 				 (ptr)->mtyp == PM_GREEN_STEEL_GOLEM || \
@@ -229,11 +231,17 @@
 				 (ptr)->mtyp == PM_HELLFIRE_ORB || \
 				 (ptr)->mtyp == PM_RAGE_WALKER || \
 				 (ptr)->mtyp == PM_FERRUMACH_RILMANI)
-#define is_iron_mon(mon)	(is_iron((mon)->data))
+#define is_iron_mon(mon)	(is_iron((mon)->data) || \
+							(mon == &youmonst && uclockwork && (u.clk_material == IRON || u.clk_material == GREEN_STEEL)))
 #define is_silver(ptr)	((ptr)->mtyp == PM_ARGENACH_RILMANI || \
 				 (ptr)->mtyp == PM_AMM_KAMEREL || \
 				 (ptr)->mtyp == PM_ARGENTUM_GOLEM)
-#define is_silver_mon(mon)	(is_silver((mon)->data) || has_template(mon, CONSTELLATION))
+#define is_silver_mon(mon)	(is_silver((mon)->data) || \
+							has_template(mon, CONSTELLATION) || \
+							(mon == &youmonst && uclockwork && (u.clk_material == SILVER)))
+#define is_platinum(ptr)	((ptr)->mtyp == PM_PLATINUM_DRAGON)
+#define is_platinum_mon(mon)	(is_platinum((mon)->data) || \
+							(mon == &youmonst && uclockwork && (u.clk_material == PLATINUM)))
 #define is_stone(ptr)	((ptr)->mtyp == PM_DUST_VORTEX || \
 				 (ptr)->mtyp == PM_EARTH_ELEMENTAL || \
 				 (ptr)->mtyp == PM_TERRACOTTA_SOLDIER || \

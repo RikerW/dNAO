@@ -1009,6 +1009,7 @@ struct you {
 	int		udisks;		/* to record how many aphanactonan disks you've read */
 	int		uboln;		/* to record how many spirits you've gained from the boln */
 	int uinvault;
+	int clk_material;	/* clockwork material */
 	struct monst *ustuck;
 	boolean petattacked;
 	boolean pethped;

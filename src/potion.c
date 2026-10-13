@@ -1503,7 +1503,7 @@ as_extra_healing:
 		}break;
 	case POT_MIDAS:
 		if (!Golded && !(Stone_resistance && youracedata->mtyp != PM_STONE_GOLEM)
-			&& !is_gold(youracedata)
+			&& !is_gold_mon(&youmonst)
 			&& !(poly_when_golded(youracedata) && polymon(PM_GOLD_GOLEM))
 			) {
 			Golded = 9;
@@ -1769,7 +1769,7 @@ boolean your_fault;
 	break;
 	case POT_MIDAS:
 		if (!Golded && !(Stone_resistance && youracedata->mtyp != PM_STONE_GOLEM)
-			&& !is_gold(youracedata)
+			&& !is_gold_mon(&youmonst)
 			&& !(poly_when_golded(youracedata) && polymon(PM_GOLD_GOLEM))
 			) {
 			Golded = 9;
@@ -2131,7 +2131,7 @@ boolean your_fault;
 		(void) bhitm(mon, obj);
 		break;
 	case POT_MIDAS:
-		if (!resists_ston(mon) && !is_gold(mon->data)) {
+		if (!resists_ston(mon) && !is_gold_mon(mon)) {
 			minstagoldify(mon, TRUE);
 		}
 		break;
