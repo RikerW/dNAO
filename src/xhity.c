@@ -22741,7 +22741,7 @@ void
 monk_aura_bolt()
 {
 	struct zapdata zapdat = { 0 };
-	basiczap(&zapdat, u_fallen() ? AD_UNHY : AD_HOLY, ZAP_SPELL, (u.ulevel+2) / 3 );
+	basiczap(&zapdat, (u_holiness() == UNHOLY_HOLINESS) ? AD_UNHY : AD_HOLY, ZAP_SPELL, (u.ulevel+2) / 3 );
 	zapdat.damd = 4;
 	zapdat.affects_floor = FALSE;
 	zapdat.phase_armor = TRUE;
@@ -22779,7 +22779,7 @@ monk_aura_bolt()
 				zapdat.affects_floor = TRUE;
 			}
 			if(uwep->oartifact == ART_KISHIN_MIRROR){
-				if(!(u_fallen() || u_blessed()))
+				if(!u_holiness())
 					zapdat.adtyp = AD_ELEC;
 				if(zapdat.adtyp != AD_UNHY)
 					zapdat.blinding = TRUE;
@@ -23198,12 +23198,12 @@ void
 incant_kishin_sparks()
 {
 	struct zapdata zapdat = { 0 };
-	basiczap(&zapdat, u_fallen() ? AD_UNHY : AD_HOLY, ZAP_SPELL, (u.ulevel+2) / 3 );
+	basiczap(&zapdat, (u_holiness() == UNHOLY_HOLINESS) ? AD_UNHY : AD_HOLY, ZAP_SPELL, (u.ulevel+2) / 3 );
 	zapdat.damd = 3;
 	zapdat.affects_floor = FALSE;
 	zapdat.phase_armor = TRUE;
 	int range = 2;
-	if(!(u_fallen() || u_blessed()))
+	if(!u_holiness())
 		zapdat.adtyp = AD_ELEC;
 	if(zapdat.adtyp != AD_UNHY)
 		zapdat.blinding = TRUE;
@@ -24608,7 +24608,7 @@ perform_monk_move(int moveID, int *move_cost)
 		case AURA_BOLT:
 		if((!uwep || is_monk_weapon(uwep)) 
 			&& (!(uswapwep && u.twoweap) || is_monk_weapon(uswapwep)) 
-			&& (u_fallen() || u_blessed()
+			&& (u_holiness()
 				|| (Role_if(PM_KENSEI) && uwep && is_kensei_weapon(uwep) && 
 					( uwep->oartifact == ART_KISHIN_MIRROR
 					|| uwep->oartifact == ART_MALICE
@@ -25464,7 +25464,7 @@ uturn_move()
 	if(activeFightingForm(FFORM_MNK_SNAKE))
 		return STRONG_P;
 	if(activeFightingForm(FFORM_MNK_KIRIN))
-		return u_blessed() ? HOLY_A : u_fallen() ? PIERCE_C : 0;
+		return (u_holiness() == HOLY_HOLINESS) ? HOLY_A : (u_holiness() == UNHOLY_HOLINESS) ? PIERCE_C : 0;
 	return METODRIVE;
 }
 
