@@ -618,6 +618,8 @@ struct you {
 #define MATTK_MUTATION    	33
 #define MATTK_SILVERMAN_THREADS	34
 #define MATTK_SILVERMAN_GLAIVE	35
+#define MATTK_FOUNDRY			36
+#define MATTK_EXPOSE_FOUNDRY	37
 
 	struct attribs	macurr,		/* for monster attribs */
 			mamax;		/* for monster attribs */
@@ -631,6 +633,7 @@ struct you {
 #define	MAX_BOILER	2000
 	int ustove;
 	int utemp;
+	int ufurnaceexposed;
 #define	WARM			 1
 #define	HOT				 2
 #define	BURNING_HOT		 5
@@ -755,7 +758,7 @@ struct you {
 	int ugifts;			/* number of artifacts bestowed */
 	int uartisval;		/* approximate strength of artifacts bestowed and wished for */
 	int ucultsval;		/* approximate strength of wished artifacts and gifts bestowed */
-	int udroolgifted, umortalgifted, utruedeathgifted, uunworthygifted, uwindowgifted;
+	int udroolgifted, umortalgifted, utruedeathgifted, uunworthygifted, uwindowgifted, usfmreforged;
 #define SHUB_DROOL_TIER TIER_S
 #define FLAME_MORTAL_TIER TIER_B
 #define FLAME_DEATH_TIER TIER_A
@@ -784,6 +787,7 @@ struct you {
 	long ucultmutations[MAX_CULTS];	/* total mutations taken from the cult */
 #define shubbie_mutations		ucultmutations[GOAT_CULT]
 #define yog_sothoth_mutations	ucultmutations[SOTH_CULT]
+#define silver_flame_mutations	ucultmutations[FLAME_CULT]
 	d_level silver_flame_z; 
 	xchar s_f_x, s_f_y; 
 	long lastprayed;
