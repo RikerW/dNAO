@@ -5585,7 +5585,25 @@ u_holiness()
 {
 	// 1 is holy, 0 is neutral, -1 is unholy
 	// fallen < -3, blessed > 3. >, not >=
-	switch (gholiness(u.ualign.god)){
+	int your_holiness = gholiness(u.ualign.god);
+
+	// binders are unholy by default. eden or simurgh will make them holy, amon or tenebrous will make them unholy. cancels out 1-1
+	if (your_holiness == VOID_HOLINESS){
+		your_holiness = 0;
+
+		if (u.sealsActive&SEAL_EDEN) your_holiness++;
+		if (u.sealsActive&SEAL_SIMURGH) your_holiness++;
+		if (u.specialSealsActive&SEAL_COSMOS) your_holiness++;
+		if (u.specialSealsActive&SEAL_TWO_TREES) your_holiness++;
+
+		if (u.sealsActive&SEAL_AMON) your_holiness--;
+		if (u.sealsActive&SEAL_TENEBROUS) your_holiness--;
+		if (u.specialSealsActive&SEAL_MISKA) your_holiness--;
+
+		if (your_holiness > 0)  your_holiness = HOLY_HOLINESS;
+		else 					your_holiness = UNHOLY_HOLINESS;
+	}
+	switch (your_holiness){
 		case UNHOLY_HOLINESS:
 		case VOID_HOLINESS:
 			return (u_blessed()) ? UNHOLY_HOLINESS : ((u_fallen()) ? HOLY_HOLINESS : NEUTRAL_HOLINESS);
